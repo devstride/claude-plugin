@@ -34,7 +34,8 @@ profile: `merge-story` on the fast path, after any refresh and its re-run local 
 the `--no-ff` merge; on the pull-request path right before the `MERGE` line, on the head it passes
 (the final reviewed head, or its tree-identical rebase); `build-item` step 8 for the release unit itself, right before its merge, on its
 release pull request's final reviewed head (`epic-release-steps.md`). A story held by a release
-hold runs it when it merges. Fetch first; the base is the SHA of `origin/<working base>` (step 8:
+hold runs it when it merges. Fetch first (it never changes the base the fast merge uses: that
+merges onto the `<tip>` `merge-story` recorded); the base is the SHA of `origin/<working base>` (step 8:
 of `origin/<the routing.py release-target branch>`) recorded now, never a local branch that may be
 stale, and the diff is `git diff --unified=0 -M <base>...<head>`.
 

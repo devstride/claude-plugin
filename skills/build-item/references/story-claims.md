@@ -51,10 +51,14 @@ moves what this session is about to ship — the stage each step's run answer na
 `heartbeat` (`building` at the build, `verifying` at the local checks, `reviewing` at the review,
 `landing` at the merge) — and completion (4) also releases that declaration, outcome `landed`.
 
-1. **Selection.** The Build workflow's first step, `claim-story`, claims a chosen candidate BEFORE
-   it moves to In Progress (`mode: select`). Held by a live holder → the run ends held and the loop
+1. **Selection.** The loop claims a chosen candidate (`claim-story`, `mode: select`) before the
+   runner resumes or starts its run, and the Build workflow's first step claims it again BEFORE it
+   moves to In Progress. Held by a live holder → no run starts (or the run ends held) and the loop
    drops it, says who holds it and takes the next candidate (the gating check's shape). Expired →
-   take over. Already yours (a resumed story) → renewed, carry on.
+   take over. Already yours (a resumed story) → renewed, carry on. Before
+   it, with `provider: devstride`, step 0 reads the live story claims once and drops candidates
+   other agents hold (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/parallel-building.md`):
+   that read saves a claim, and this claim still decides.
 2. **A story the user NAMED, or the handoff's resumed story** (`mode: named` / `resume`) held by
    another live holder → the run ends held and the loop STOPS, naming that holder's machine and
    session and since when. Expired → take over, as in selection. Your own earlier session (after a
@@ -91,3 +95,5 @@ same way. A claims outage never stops delivery.
 - `skills/ultracode-build/SKILL.md` — the phase heartbeats.
 - `skills/run-workflow/references/workflow-runner.md` — the heartbeat and the claim mode.
 - `skills/build-item/references/ship-intent.md` — sending a declaration as a claim is sent.
+- `skills/build-item/references/parallel-building.md` — the holder, the record and the degrade
+  rules for plan slots and the epic-release claim.

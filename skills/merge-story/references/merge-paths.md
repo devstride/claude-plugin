@@ -53,11 +53,14 @@ and the `receipt` for this tree).
 ## Fast merge (review path `fast-local`)
 
 - Clean tree, every review fix committed.
-- **Base moved** (`origin/<workingBase>` not an ancestor of `commit` after `git fetch origin`) →
+- **Base moved**: after `git fetch origin`, record the base ONCE: `git rev-parse --verify
+  origin/<workingBase>` prints it, written into the rules below as `<tip>` (a shell variable does
+  not outlive its call; linked worktrees share `origin/*`, so another checkout's fetch can move the
+  ref, never this id). `git merge-base --is-ancestor <tip> <commit>` fails →
   merge the refreshed base INTO the story, push the story branch, and answer `MERGE: REFRESHED`:
   the runner re-runs the local checks on the new tree (and the review when the patch changed), then
   asks again. A conflict that cannot be resolved → `MERGE: BLOCKED` for a person.
-- **The landing gate** (release train): in the story's checkout, before switching branches,
+- **The landing gate** (release train): in the story's checkout, before leaving the story branch,
   `python3 ${CLAUDE_PLUGIN_ROOT}/skills/build-item/scripts/review-gate.py check` with `{"base":
   "origin/<train>", "head": "<commit>"}` must answer `small`, `reviewed` (here, or carried forward
   under an unchanged patch) or `not-applicable`. Exit 2
@@ -65,23 +68,24 @@ and the `receipt` for this tree).
   (`${CLAUDE_PLUGIN_ROOT}/skills/review/references/local-full.md`, "A later change to the patch"),
   which records the review, then check again; a follow-up that changed the head answers
   `REFRESHED`. Never merge on a non-zero exit.
-- `git checkout <workingBase> && git pull --ff-only`, then `git rev-list --count
-  origin/<workingBase>..<workingBase>` must print `0`: a local base ahead of its remote →
-  `MERGE: BLOCKED local <workingBase> is ahead of origin`, nothing merged. Record the tip: `git rev-parse
-  HEAD` prints it, written into the undo below as `<tip>` (a shell variable does not outlive its
-  call), then merge the story `--no-ff <commit>` per
-  `commitConventions.epicMergeFormat` (fallback
+- **Never check out `<workingBase>` by name** (another worktree may hold it; git refuses it
+  there), and never detach at the ref: `git checkout --detach <tip> && git merge-base --is-ancestor
+  <tip> <commit>`, the id "Base moved" recorded and proved, proved again just before the merge
+  (fails → `git checkout <branch>`, do "Base moved", `MERGE: REFRESHED`; a branch that moved since
+  refuses the push). Then merge the story `--no-ff <commit>` per `commitConventions.epicMergeFormat`
+  (fallback
   `merge: <itemNumber> [<N>] <short scope> into <epic-slug> integration`). On the train the subject
   is `merge: <itemNumber> <short scope> into <train>`: the item number always leads, whatever
   `epicMergeFormat` says, because `release` reads it later. The BODY carries the review's
   `mergeBody` (each dismissed finding from the risk check and the review, with its rationale, and
   the landing gate's lines) and the commands and counts of the verification receipt for this tree.
-- `git push origin <workingBase>`. **Only once that push SUCCEEDS** delete the story branch locally
-  AND remotely. A refused push → undo exactly this merge, never reset to the remote: when `git
-  rev-parse HEAD^1 HEAD^2` prints `<tip>` and `commit` (HEAD is the merge just made), `git reset
-  --hard <tip>`; then `git checkout <branch>`; then `MERGE: BLOCKED push refused: <first line>`,
-  nothing deleted. Never leave HEAD on the local merge commit: the runner would read it as a new
-  commit.
+- `git push origin HEAD:refs/heads/<workingBase>`. **Only once that push SUCCEEDS** delete the story
+  branch locally AND remotely; HEAD stays detached on the merge just pushed. A refused push →
+  `git checkout <branch>`, which leaves the detached merge behind (nothing to reset); then `git
+  fetch origin`. The branch moved (`origin/<workingBase>` is no longer `<tip>`: another story
+  landed first) → do "Base moved" above and answer `MERGE: REFRESHED`; any other refusal →
+  `MERGE: BLOCKED push refused: <first line>`. Nothing deleted either way. Never leave HEAD on the
+  local merge commit: the runner would read it as a new commit.
 
 ## Pull-request merge (review path `pull-request`)
 

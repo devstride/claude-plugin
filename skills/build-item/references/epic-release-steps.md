@@ -7,19 +7,32 @@ A branch reference (CONTRIBUTING.md, "Branch references"): `build-item` step 8 k
 zero remaining leaves, working base the unit's integration branch, auto-release on per
 `epicIntegrationBranches.autoRelease` — and reads this file in full before acting on a release
 that fires, or on step 0's recovery close-out after an owner merged the release. Every bullet is an
-instruction for a release that fires; a recovery close-out applies only the Merge bullet from
-"close out" onward — never Refresh, verify, cut or merge again. The reasoning behind them is
+instruction for a release that fires; a recovery close-out applies the claim, then only the Merge
+bullet from "close out" onward — never Refresh, verify, cut or merge again. The reasoning behind them is
 `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/epic-release.md`.
 
 ## Steps
+
+- **Claim first**, at either entry (step 7 at zero, or step 0's dry chain or recovery close-out),
+  unless auto-release is off: kind `epic-release`, key the release unit's number (plan scope: the
+  plan's unit), as `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/parallel-building.md` says.
+  `skip` → name who is releasing it, and carry on with this session's loop (reached from the
+  dry chain: exit). Heartbeat it at each ship-intent stage of the release (`reviewing`,
+  `verifying`, `landing`); after the close-out, release it, outcome `released`, never final. A
+  STOP keeps it.
 
 In plan scope, the refresh source, the cut base and the close-out change as
 `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plan-scope.md` says; read it with this file.
 With `claims` set, the release is declared as
 `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/ship-intent.md` says.
 
-- **Refresh**: pull the epic branch, fetch `baseBranch`, merge its captured tip `<baseOid>` — merge,
-  NEVER rebase shared story SHAs; non-mechanical conflicts STOP. Push.
+- **Refresh**: the loop's ONE checkout of the epic branch by name: only the releasing session (the
+  `epic-release` claim holder when claims are in use) runs it, and no story step holds a shared
+  branch (each works detached). Release-only by name: `git checkout <epic branch> && git pull
+  --ff-only origin <epic branch>`; git refuses it because another worktree
+  holds it → STOP naming that worktree (`git worktree list`), never force. Fetch `baseBranch`,
+  merge its captured tip `<baseOid>` — merge, NEVER rebase shared story SHAs; non-mechanical
+  conflicts STOP. Push. `/devstride:pr` then opens the pull request from this named branch.
 - **One verification plan for the merged tree**: aggregate story receipts, invalidating only what the
   refresh or combined tree changed. A `verify.typecheck`/`test`/`lint` command the PR workflows run
   exactly is not run locally; a required command CI lacks runs once as a pre-ship check on the final
@@ -75,3 +88,4 @@ With `claims` set, the release is declared as
 - `skills/build-item/references/next-unblocked.md` — the Close-out bullet, for the release unit's
   comment and Done.
 - `skills/build-item/references/plan-scope.md` — the plan's release reuses these steps.
+- `skills/build-item/references/parallel-building.md` — the epic-release claim.

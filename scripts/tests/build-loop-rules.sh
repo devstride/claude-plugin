@@ -12,6 +12,7 @@ ROOT = sys.argv[1]
 flat = lambda text: re.sub(r"\s+", " ", text.replace("**", ""))
 read = lambda path: flat(open(os.path.join(ROOT, path), encoding="utf-8").read())
 RS = "skills/build-item/references/run-stops.md"
+WR, PB = "skills/run-workflow/references/workflow-runner.md", "skills/build-item/references/parallel-building.md"
 BI, MP, RR, LC = "skills/build-item/SKILL.md", "skills/merge-story/references/merge-paths.md", \
     "skills/review-story/references/review-routes.md", "skills/local-checks/SKILL.md"
 
@@ -43,8 +44,8 @@ MUST = [
      "a later screen has nothing to name what it resolved by"),
     (RS, "Keep the lease (`checkout-pool-commands.md`: a STOP this session will resume keeps it)",
      "a resumable stop hands the checkout back"),
-    (BI, "Terminal exit or hand-over only: `return-checkout`, after its own check: `git checkout <working base> && git pull --ff-only`",
-     "the checkout is returned dirty after a stop that never reached the sync"),
+    (BI, "Terminal exit or hand-over only: `return-checkout`, after its own check: `git fetch origin && git checkout --detach origin/<working base>`",
+     "the checkout is returned dirty after a stop that never reached the sync, or the check stops on a base another worktree holds"),
     (BI, "A named or resumed story, or a one-off, has no next candidate: a terminal exit, through step 7's terminal exit (its check, then `return-checkout`)",
      "a named one-off under a release hold is rebuilt round and round, or a held story keeps an unused checkout"),
     (BI, "push the story branch (`git push origin <branch>`), then report \"held: <reason>\" and what lifts it",
@@ -66,14 +67,22 @@ MUST = [
      "a story the loop declined stays claimed until it expires"),
     (BI, "Any command refused `wrong-branch` (a `resume`, `next` or `done` of an adopted run off its story branch, named)",
      "an adopted run builds, checks or reviews on the base or a detached head, or a refused done is never sent again"),
-    (BI, "`git fetch origin \"+refs/heads/<branch>:refs/remotes/origin/<branch>\"`",
+    (WR, "`git fetch origin \"+refs/heads/<branch>:refs/remotes/origin/<branch>\"`",
      "a clone tracking only the base fills FETCH_HEAD and the checkout fails"),
-    (BI, "(so a bare `git push` works where the clone's fetch rule misses the branch)",
+    (WR, "(so a bare `git push` works where the clone's fetch rule misses the branch)",
      "the two config commands read as optional and are dropped"),
-    (BI, "then `git checkout <branch>` when it exists here, else `git checkout -b <branch> origin/<branch> && git config branch.<branch>.remote origin && git config branch.<branch>.merge refs/heads/<branch>`",
+    (WR, "then `git checkout <branch>` when it exists here, else `git checkout -b <branch> origin/<branch> && git config branch.<branch>.remote origin && git config branch.<branch>.merge refs/heads/<branch>`",
      "the recovered branch has no upstream and the next bare push fails, or a fetch rule outlives the deleted branch"),
-    (BI, "(for a branch only here it fails, harmlessly)", "a failed fetch of a local-only branch is read as a stop"),
-    (BI, "a named or handed-off story after step 0's claim check; a selected one straight away", "a selected story looks for a claim check it never had"),
+    (WR, "(for a branch only here it fails, harmlessly)", "a failed fetch of a local-only branch is read as a stop"),
+    (BI, "check it out as run-workflow's `workflow-runner.md` says (or STOP), then the same request again",
+     "the build loop no longer points at the branch recovery that moved to the runner's reference"),
+    (BI, "`resume` with the item first** (after step 0's claim check)", "a selected story looks for a claim check it never had"),
+    (BI, "Claim before the runner: `claims` set → claim a selected story (`claim-story`, mode `select`) as (1) a named one: `HELD` → next candidate, lease kept, no `resume` or `start`",
+     "a selected story's resume adopts and removes the unfinished run another live session on this machine is driving"),
+    (PB, "The first remaining candidate is claimed (`claim-story`, mode `select`) BEFORE the runner resumes or starts its run",
+     "parallel building still lets a selected story reach the runner unclaimed"),
+    ("skills/build-item/references/story-claims.md", "The loop claims a chosen candidate (`claim-story`, `mode: select`) before the runner resumes or starts its run",
+     "the claim reference still says the run's first step is the only claim"),
     (BI, "Refused `no-run` or `run-other-repository` → `start`", "another repository's run blocks this one"),
     (BI, "`resume` with the item first", "a cleared conversation starts a duplicate run and loses the original"),
     (BI, "A `start` refused `run-open` means a run exists: `resume` it", "the refusal is read as a stop"),
@@ -116,8 +125,49 @@ MUST = [
      "a release-held story is selected again"),
     (MP, "Landed means landed", "a merge that landed answers BLOCKED and the run cannot recover"),
     (MP, "Never leave HEAD on the local merge commit", "a refused push sends the merge round until its attempts run out"),
-    (MP, "undo exactly this merge, never reset to the remote", "an unrelated unpushed commit on the base is discarded"),
-    (MP, "`MERGE: BLOCKED local <workingBase> is ahead of origin`", "a merge starts on a base holding commits nobody reviewed"),
+    (MP, "Never check out `<workingBase>` by name", "a second agent on one machine stops because another worktree holds the base"),
+    (MP, "record the base ONCE: `git rev-parse --verify origin/<workingBase>` prints it, written into the rules below as `<tip>`",
+     "the merge reads the shared remote ref again, which another worktree's fetch can move"),
+    (MP, "`git merge-base --is-ancestor <tip> <commit>` fails → merge the refreshed base INTO the story",
+     "the ancestry check tests a ref instead of the recorded commit"),
+    (MP, "never detach at the ref: `git checkout --detach <tip> && git merge-base --is-ancestor <tip> <commit>`",
+     "the fast merge is made on a base branch another worktree may hold, or on a newer tip the local checks never ran with"),
+    (MP, "(fails → `git checkout <branch>`, do \"Base moved\", `MERGE: REFRESHED`",
+     "a failed re-proof merges anyway"),
+    ("skills/build-item/references/consequence-notices.md", "it never changes the base the fast merge uses: that merges onto the `<tip>` `merge-story` recorded",
+     "the notices' fetch reads as moving the merge's base"),
+    (MP, "`git push origin HEAD:refs/heads/<workingBase>`", "the fast merge pushes a local base branch instead of the detached merge"),
+    (MP, "A refused push → `git checkout <branch>`, which leaves the detached merge behind (nothing to reset)",
+     "a refused push resets a base branch, or leaves HEAD on the unpushed merge"),
+    ("skills/sync-base/SKILL.md", "`git fetch origin && git checkout --detach origin/<workingBase>`",
+     "the sync stops because another worktree on this machine holds the working base"),
+    ("skills/branch-feature/SKILL.md", "`git checkout --no-track -b <new-branch> origin/<working base>` (never the shared base as its upstream)",
+     "the story branch is cut after checking out a base another worktree holds, or tracks the base so a bare push targets it"),
+    ("skills/branch-feature/SKILL.md", "then ask origin for exactly that branch every time, even when its upstream settings already name it (git keeps them after the remote branch is deleted)",
+     "a re-run trusts upstream settings that outlive a deleted remote branch, and its pull fails"),
+    ("skills/branch-feature/SKILL.md", "`if git ls-remote --exit-code origin refs/heads/<branch> >/dev/null; then git config branch.<branch>.remote origin && git config branch.<branch>.merge refs/heads/<branch>; else git push -u origin <branch>; fi` (the full ref: a bare name also matches `archive/<branch>`; a failure → `REFUSED`); then `git pull --ff-only`",
+     "a re-run pulls from, or pushes to, the shared base its branch was left tracking, takes archive/<branch> for the branch, or the repair fails in a single-branch clone"),
+    (PB, "Create it without checking it out: `git fetch origin && git push origin origin/<from>:refs/heads/<epic branch>`",
+     "the new epic branch is checked out here and blocks every other worktree's landing"),
+    ("skills/build-item/references/plan-scope.md", "never checking the epic branch out by name",
+     "a plan-scope refresh checks out an epic branch another worktree holds"),
+    ("skills/build-item/references/plan-scope.md", "refused → `git fetch origin`: the epic branch moved → test again, otherwise STOP naming the refusal's first line",
+     "a protection or permission refusal is retried for ever"),
+    ("skills/build-item/references/plan-scope.md", "`git checkout --detach origin/<plan branch> && git merge --no-ff origin/<from>`, then `git push origin HEAD:refs/heads/<plan branch>`; refused → `git fetch origin`: the plan branch moved → refresh again, otherwise STOP naming the refusal's first line",
+     "the release's plan refresh checks out the plan branch by name, or loops on a refusal"),
+    ("skills/build-item/references/epic-release-steps.md", "Release-only by name: `git checkout <epic branch> && git pull --ff-only origin <epic branch>`",
+     "the epic release's by-name checkout is unmarked, or the release refreshes a stale epic branch"),
+    ("skills/build-item/references/epic-release-steps.md", "STOP naming that worktree (`git worktree list`), never force",
+     "a release forces a checkout another worktree holds"),
+    ("skills/build-item/references/epic-release-steps.md", "only the releasing session (the `epic-release` claim holder when claims are in use) runs it",
+     "the by-name epic checkout reads as something any session may do, or as forbidden without claims"),
+    ("skills/build-item/references/plan-scope.md", "the releasing session (the `epic-release` claim holder when claims are in use) checked out by name",
+     "the plan-scope release reads as forbidden without claims"),
+    (BI, "refresh (the releasing session's one checkout of the epic branch by name)", "the body hides that the release checks the epic branch out"),
+    ("CHANGELOG.md", "Only an epic's release works on the epic branch itself, in the checkout of the one session releasing it",
+     "the release note claims no step ever checks out a shared branch"),
+    ("skills/build-item/references/release-train.md", "without checking it out (`git push origin origin/<baseBranch>:refs/heads/<train>`)",
+     "a new train is checked out here and blocks other worktrees' landings"),
     (MP, "has three answers: exactly `commit` landed; it landed, but this check cannot prove how; or nothing landed",
      "a descendant that landed is taken as the checked commit"),
     (MP, "`git rev-list --first-parent --parents origin/<workingBase> | awk -v c=<commit> 'NF == 3 && $3 == c { print $1; exit }'`",
@@ -172,10 +222,44 @@ MUST = [
      "a NOT CONFIGURED verdict with a detail is refused as no verdict"),
     ("skills/ultracode-build/SKILL.md", "Already built.", "a re-routed one-off is built twice"),
     ("skills/branch-feature/SKILL.md", "A pull that cannot fast-forward", "a diverged branch is merged or reset"),
+    (BI, "Parallel by claim. Agents share a plan only through claims, up to DevStride's stored limit; every terminal exit releases the plan slot (`references/parallel-building.md`)",
+     "the floor still reads as one agent per plan, or a second agent shares a plan with no claim"),
+    (BI, "Plan slot (plan mode), before selection: take it per `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/parallel-building.md`",
+     "an agent beyond the stored limit starts building"),
+    (BI, "full → its message, `return-checkout`, end", "a full plan keeps the checkout or starts a story"),
+    (BI, "minus other agents' claims (`parallel-building.md`)", "a second agent starts a run for a story another agent holds"),
+    (PB, "at EVERY terminal exit — step 0's, step 7's, a named or resumed story ending held, step 8's release-ready stop with auto-release off",
+     "a finished agent keeps its plan slot until it expires"),
+    (PB, "unless `localEnvironment.instanceBoundTo` is `directory`", "two agents on one machine run their tests on one shared database"),
+    (PB, "`busy` → say its message, take no slot, `return-checkout` and end", "a second agent on a machine with a shared environment starts building"),
+    (PB, "expiry the `plan-slot` entry of `claims.expiryMinutes` when set", "a configured slot expiry is ignored"),
+    (PB, "expiry the `epic-release` entry of `claims.expiryMinutes` when set", "a configured release-claim expiry is ignored"),
+    (PB, "`degrade` → step 8 without the claim, said once per session", "a claims outage blocks every epic release"),
+    (PB, "`stop` (an answer it could not read) → cut nothing, say so and stop", "an unreadable claim answer cuts a release anyway"),
+    (BI, "Claim first, from step 7 or step 0 (dry chain, recovery), unless auto-release is off: the `epic-release` claim",
+     "two agents landing the last two stories each cut a release of the same epic"),
+    (BI, "before any question; held → say who, carry on", "two agents each ask the owner about the same release"),
+    (BI, "refused → resolve again and adopt, `parallel-building.md`", "two agents mint two branches for one epic"),
+    (BI, "Handoff memory, one in-progress line per session", "two sessions on one machine resume each other's story"),
+    (PB, "`decide` with `{mode: \"take\", root, slot: n, limit, response, me, now, tz}`", "the slot answer is judged by eye"),
+    (PB, "A STOP keeps it, as it keeps a story claim", "a stopped session loses its slot and cannot resume"),
+    (PB, "Never wait or poll", "an agent with nothing free waits in a loop"),
+    (PB, "outcome `released`, NOT final", "a reopened epic can never be released again"),
+    (PB, "a second name is never minted", "two agents mint two branches for one epic"),
+    (MP, "The branch moved (`origin/<workingBase>` is no longer `<tip>`: another story landed first) → do \"Base moved\" above and answer `MERGE: REFRESHED`",
+     "a story whose push lost the race to another story's landing stops as BLOCKED"),
+    (RS, "A push refused because another story landed first is not a stop: the merge answers `MERGE: REFRESHED`",
+     "the run-stops text still sends a lost landing race through a stop"),
+    ("skills/build-item/references/epic-release-steps.md", "Claim first, at either entry (step 7 at zero, or step 0's dry chain or recovery close-out)",
+     "the release steps run without the release claim"),
 ]
 # (home, text that must be gone, the fault it was)
 GONE = [
     (BI, "exit through step 7's terminal exit", "every stop handed the checkout back"),
+    (BI, "Serial by design", "the floor said one agent per plan after several became allowed"),
+    ("skills/build-item/references/next-unblocked.md", "the loop itself stays serial", "selection said one agent per plan"),
+    ("skills/setup/references/config-defaults.md", "the serial-execution rule in `build-item` stands", "the setup text cited a rule that no longer exists"),
+    ("README.md", "one story at a time", "the README said one agent per plan"),
     (BI, "a run already open for this item → `resume` instead", "status sees only this session, so the original run was never found"),
     ("skills/ultracode-build/SKILL.md", "toleratedTypeErrors", "the tolerance sat in a step that no longer runs the gate"),
     (RR, "## The gate's width", "the width was decided in a file read after the gate"),
@@ -190,6 +274,20 @@ GONE = [
      "the receipt moved to local-checks"),
     ("skills/run-workflow/scripts/workflow.py", "resume to check what changed", "a landed merge cannot be resumed"),
     (MP, "git reset --hard origin/<workingBase>", "a refused push discarded unrelated local commits"),
+    (MP, "local <workingBase> is ahead of origin", "a dead check on a local base branch the detached merge never uses"),
+    (MP, "`git fetch origin && git checkout --detach origin/<workingBase>`", "the merge re-fetched and landed on a tip the local checks never ran with"),
+    (MP, "git checkout --detach origin/<workingBase>", "the merge detached at a shared ref another worktree's fetch could move"),
+    ("skills/branch-feature/SKILL.md", "@{upstream}", "the upstream check failed in a single-branch clone"),
+    ("skills/branch-feature/SKILL.md", "git branch -u", "the upstream repair failed in a single-branch clone"),
+    ("skills/branch-feature/SKILL.md", "ls-remote --heads origin <branch>", "the remote check matched archive/<branch> as the story branch"),
+    ("skills/branch-feature/SKILL.md", "unless `git config branch.<branch>.remote` prints", "the re-run skipped the remote check when settings git keeps after a deletion matched"),
+    ("skills/build-item/references/epic-release-steps.md", "only the `epic-release` claim holder runs it", "the release checkout read as forbidden without claims"),
+    (BI, "the claim holder's one checkout", "the release checkout read as forbidden without claims"),
+    ("skills/branch-feature/SKILL.md", "`git checkout -b <new-branch> origin/<working base>`", "the new story branch tracked the shared base"),
+    ("skills/build-item/references/plan-scope.md", "(refused → fetch and test again)", "every refusal was retried, a permission refusal for ever"),
+    ("skills/build-item/references/plan-scope.md", "merge `origin/<from>` into it (`--no-ff`), push", "the release's plan refresh had no detached form"),
+    ("skills/build-item/references/epic-release-steps.md", "pull the epic branch, fetch", "the release's by-name checkout was implicit"),
+    (BI, "a selected one straight away", "a selected story reached the runner before its claim, and its resume could adopt a live session's run"),
     (MP, "--base <reviewProof.base>", "the carry passed a remote ref where a bare branch is needed"),
     (MP, "for its settle of this head", "no such review mode"),
     (MP, "git merge-base --is-ancestor <commit> origin/<workingBase>` → find the merge commit", "an ancestor is not exactly the commit"),
@@ -218,6 +316,54 @@ GONE = [
      "any open hotfix of the session, for whatever item, sent a hotfix for another item to resume or close it"),
 ]
 problems = []
+# No step a story session runs checks out a shared branch by name: two agents on one machine work in
+# linked worktrees of one repository, and git refuses a branch another worktree holds. Only a span the
+# text itself forbids ("Never `git checkout <workingBase>`") may name one, and only in the epic release's
+# steps a span marked "Release-only by name:" (the releasing session's one checkout of the epic branch).
+RELEASE_HOME = "skills/build-item/references/epic-release-steps.md"
+STORY_HOMES = [BI, MP, PB, RS, WR, "skills/sync-base/SKILL.md", "skills/branch-feature/SKILL.md", "skills/merge-story/SKILL.md",
+               "skills/build-item/references/plan-scope.md", "skills/build-item/references/release-train.md",
+               "skills/build-item/references/story-claims.md", "skills/build-item/references/checkout-pool-commands.md",
+               "skills/build-item/references/next-unblocked.md", "skills/build-item/references/ground-truth-at-start.md",
+               RELEASE_HOME]
+SHARED = re.compile(r"(^|&&\s*|;\s*|\(\s*)git (checkout|switch)( -q)? (<workingBase>|<working base>|<baseBranch>|<train>|<epic branch>|<plan branch>|<integration branch>)(\s|;|&&|\)|$)")
+def by_name(text, home=None):
+    """The backticked spans of `text` that check out a shared branch by name, unless the text marks them:
+    "Never " anywhere, "Release-only by name: " only in the epic release's steps."""
+    exempt = ("Never ", "Release-only by name: ") if home == RELEASE_HOME else ("Never ",)
+    return [found.group(1) for found in re.finditer(r"`([^`]+)`", text)
+            if SHARED.search(found.group(1)) and not text[:found.start()].endswith(exempt)]
+for home in STORY_HOMES:
+    for span in by_name(read(home), home):
+        problems.append("%s checks out a shared branch by name: %r (a second agent on the machine stops there)" % (home, span))
+# the scan itself: a checkout after `&&`, `;` or `(`, and one followed by `;`, `&&` or `)`, is caught; the detached and
+# new-branch forms are not; a marked span is exempt only in the epic release's steps
+SELF = [("`git fetch origin && git checkout <epic branch>`", None, 1), ("`git fetch origin; git switch <train>`", None, 1),
+        ("`git fetch origin && git checkout <train>; git status`", None, 1), ("`git fetch origin && git checkout <train>&& git status`", None, 1),
+        ("`(git checkout <plan branch>)`", None, 1),
+        ("`git checkout <workingBase> && git pull --ff-only`", None, 1), ("`git checkout --detach origin/<workingBase>`", None, 0),
+        ("`git checkout --detach <tip>`", None, 0),
+        ("`git checkout --no-track -b <branch> origin/<working base>`", None, 0), ("Never `git checkout <workingBase>`", None, 0),
+        ("Release-only by name: `git checkout <epic branch> && git pull --ff-only origin <epic branch>`", RELEASE_HOME, 0),
+        ("Release-only by name: `git checkout <epic branch> && git pull --ff-only origin <epic branch>`", MP, 1),
+        ("by name: `git checkout <epic branch>`", RELEASE_HOME, 1)]
+for text, home, want in SELF:
+    if len(by_name(flat(text), home)) != want:
+        problems.append("the shared-branch scan reads %r in %s wrongly (want %d hit)" % (text, home, want))
+# in-memory mutations of real homes: each must be flagged
+MUTATIONS = [
+    (MP, "`git checkout --detach <tip> && git merge-base --is-ancestor <tip> <commit>`", "`git fetch origin && git checkout <workingBase>`"),
+    (MP, "`git checkout --detach <tip> && git merge-base --is-ancestor <tip> <commit>`", "`git fetch origin && git checkout <train>; git status`"),
+    ("skills/sync-base/SKILL.md", "`git fetch origin && git checkout --detach origin/<workingBase>`",
+     "Release-only by name: `git checkout <workingBase> && git pull --ff-only`"),
+    ("skills/build-item/references/plan-scope.md", "`git checkout --detach origin/<plan branch> && git merge --no-ff origin/<from>`",
+     "Release-only by name: `git checkout <plan branch>; git merge --no-ff origin/<from>`"),
+]
+for home, before, after in MUTATIONS:
+    original = read(home)
+    mutated = original.replace(flat(before), flat(after))
+    if mutated == original or not by_name(mutated, home):
+        problems.append("the shared-branch scan misses %r mutated into %s" % (after, home))
 for home, text, why in MUST:
     if flat(text) not in read(home):
         problems.append("%s lacks %r (%s)" % (home, text, why))

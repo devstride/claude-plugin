@@ -2,7 +2,8 @@
 # scripts/tests/build-citations.sh — the Build loop's steps are step skills now, so nothing under
 # skills/ or schemas/ cites build-item by a removed step number (steps 1 to 6.5, 4a, 4b, 5a, 5b),
 # no file of build-item's own holds those numbers as a token, the step numbers the loop keeps (0, 7
-# and 8) are still its headings, and no seam registry caller names a removed step. Every match is
+# and 8) are still its headings, no seam registry caller names a removed step, and the
+# parallel-building contract is cited from build-item, next-unblocked.md and story-claims.md. Every match is
 # anchored on both sides, so another skill's own step 5b or 6.5 never trips it. Both word orders
 # count ("build-item step 4a", "step 4a of build-item"). After the check on the real tree, a mutation
 # check plants each kind of stale citation in a copy of skills/ and schemas/ and requires the check
@@ -49,6 +50,13 @@ for heading in ("## 0. ", "## 7. ", "## 8. "):
     if not re.search(r"^" + re.escape(heading), body, re.M):
         problems.append("skills/build-item/SKILL.md lost the heading %r that callers cite" % heading)
 
+# the parallel-building contract is reachable from every file that selects or claims a story
+for citer in ("skills/build-item/SKILL.md", "skills/build-item/references/next-unblocked.md",
+              "skills/build-item/references/story-claims.md"):
+    with open(os.path.join(ROOT, citer), encoding="utf-8") as handle:
+        if "parallel-building.md" not in handle.read():
+            problems.append("%s does not cite references/parallel-building.md" % citer)
+
 with open(os.path.join(ROOT, "schemas/seam-registry.json"), encoding="utf-8") as handle:
     registry = json.load(handle)
 for hook in registry["hooks"]:
@@ -62,7 +70,7 @@ for hook in registry["hooks"]:
 for problem in problems:
     print("  FAIL %s" % problem)
 if not problems:
-    print("  ok   no removed Build step is cited under skills/ or schemas/; build-item keeps ## 0., ## 7. and ## 8.; every registry caller names a live step")
+    print("  ok   no removed Build step is cited under skills/ or schemas/; build-item keeps ## 0., ## 7. and ## 8.; every registry caller names a live step; parallel-building.md is cited where a story is selected or claimed")
 sys.exit(1 if problems else 0)
 PY
 python3 "$WORK/check.py" "$ROOT"; RC=$?

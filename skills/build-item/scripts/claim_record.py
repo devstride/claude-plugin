@@ -11,9 +11,12 @@ claim this plugin writes uses — standard library only, no network. The naming 
   python3 claim_record.py machine          prints the machine name alone.
 
 The machine name is DEVSTRIDE_MACHINE_NAME (the fleet name a repository's machine setup records),
-else the hostname without a trailing `.local`; either is lower-cased, every run of characters other
+else, on macOS, the Mac's own local name (`scutil --get LocalHostName`, which stays the same on every
+network, where the hostname follows the network a Mac joins), else the hostname without a trailing
+`.local`; any of them is lower-cased, every run of characters other
 than letters, digits and hyphens becomes one hyphen, and leading or trailing hyphens are dropped —
-the same rule the product's own command line uses, so both spell a machine the same way. The session
+the same spelling rule the product's own command line uses (which names a Mac by its hostname, so
+setting DEVSTRIDE_MACHINE_NAME keeps the two the same there). The session
 name is the Claude Code session's own name (the one `/rename` sets), else DEVSTRIDE_SESSION.
 """
 import json
@@ -29,9 +32,31 @@ SEMVER = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
 PLUGIN_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 
+_MAC_NAME = []  # the Mac's local name, looked up once per process ("" when it could not be)
+
+
+def mac_local_name(run=subprocess.run, platform=None):
+    """The Mac's LocalHostName (the name it keeps on every network), looked up once per process with
+    a 2-second limit; "" off macOS or when the look-up fails."""
+    if _MAC_NAME:
+        return _MAC_NAME[0]
+    if (platform or sys.platform) != "darwin":
+        return ""
+    if not _MAC_NAME:
+        try:
+            found = run(["scutil", "--get", "LocalHostName"], capture_output=True, text=True, timeout=2)
+            name = found.stdout.strip() if found.returncode == 0 else ""
+        except (OSError, subprocess.SubprocessError, ValueError):
+            name = ""
+        _MAC_NAME.append(name)
+    return _MAC_NAME[0]
+
+
 def machine_name(env=None, hostname=None):
     env = os.environ if env is None else env
-    raw = env.get("DEVSTRIDE_MACHINE_NAME") or re.sub(r"\.local$", "", hostname if hostname is not None else socket.gethostname())
+    if hostname is None:
+        hostname = mac_local_name() or socket.gethostname()
+    raw = env.get("DEVSTRIDE_MACHINE_NAME") or re.sub(r"\.local$", "", hostname)
     return re.sub(r"^-+|-+$", "", re.sub(r"[^a-z0-9-]+", "-", raw.lower()))
 
 

@@ -1,9 +1,12 @@
 #!/bin/bash
 # scripts/tests/merge-commands.sh — the git commands the merge and its stops spell out, run exactly
 # as the references write them (read from the files, placeholders filled in) in throwaway
-# repositories with a bare origin: the exact-landing test, the fast merge's guard and its undo
-# after a refused push, the excluded-paths re-route's rebase and push, and the durable proof's
-# carry command. Each case also shows the fault the old wording had. No network.
+# repositories with a bare origin: the exact-landing test, the fast merge from a detached HEAD at
+# the recorded base commit beside a worktree holding the base (and a peer worktree landing in
+# between) and its return to the story branch after a refused push, the sync, story branch and its
+# first push, its re-run check on origin (full and single-branch clones, a remote branch deleted and
+# pruned, only archive/<branch> on origin) and new epic branch commands beside that worktree, the excluded-paths
+# re-route's rebase and push, and the durable proof's carry command. Each case also shows the fault the old wording had. No network.
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 FAIL=0; ok() { echo "  ok   $1"; }; bad() { echo "  FAIL $1"; FAIL=1; }
@@ -30,11 +33,19 @@ def flat(path):
     return re.sub(r"\s+", " ", open(path, encoding="utf-8").read().replace("**", ""))
 
 
-def command(path, starts):
-    """The one backticked command in `path` that starts with `starts`, white space collapsed."""
-    found = [span for span in re.findall(r"`([^`]+)`", flat(path)) if span.startswith(starts)]
+def command(path, starts, after=None):
+    """The one backticked command in `path` that starts with `starts`, white space collapsed;
+    with `after`, read from that text on (a file whose earlier code fences leave an odd count)."""
+    return spelled(flat(path), starts, after, os.path.basename(path))
+
+
+def spelled(text, starts, after=None, name="the text"):
+    """`command` over text already read and flattened, so a case can run an in-memory edit of it."""
+    if after is not None:
+        text = text[text.index(after) + len(after):] if after in text else ""
+    found = [span for span in re.findall(r"`([^`]+)`", text) if span.startswith(starts)]
     if len(found) != 1:
-        raise SystemExit("FAIL %s holds %d commands starting %r" % (os.path.basename(path), len(found), starts))
+        raise SystemExit("FAIL %s holds %d commands starting %r" % (name, len(found), starts))
     return found[0]
 
 
@@ -77,6 +88,12 @@ def setup():
     story = commit(repo, "export.txt", "export\n", "add the export")
     git(repo, "push", "-q", "-u", "origin", "feature")
     return bare, repo, story
+
+
+def fresh_clone(bare, single=True):
+    clone = fresh("single" if single else "full")
+    git(clone, "clone", "-q", *((["--single-branch", "--branch", "main"] if single else []) + [bare, "."]))
+    return clone
 
 
 def other_author(bare, message):
@@ -242,30 +259,179 @@ check("the unproven answer says exactly that, and never that the code went unche
       "landed, but this check cannot prove how" in flat(MP) and "landed, but this check cannot prove how" in flat(RS)
       and "never checked or reviewed" not in flat(RS) and "carrying <commit>" not in flat(MP))
 
-# --- the fast merge: never on a base ahead of its remote; a refused push undoes exactly the merge
-AHEAD = command(MP, "git rev-list --count origin/<workingBase>..<workingBase>").replace("<workingBase>", "main")
-UNDO_CHECK = command(MP, "git rev-parse HEAD^1 HEAD^2")
-check("the undo is spelled as the reset to the tip written down before the merge, never to the remote, and never through a shell variable",
-      "git reset --hard <tip>" in flat(MP) and "git reset --hard origin/<workingBase>" not in flat(MP) and "$tip" not in flat(MP))
+# --- the fast merge: on a detached HEAD at the recorded base commit, never on a branch another worktree holds
+RECORD = command(MP, "git rev-parse --verify origin/<workingBase>").replace("<workingBase>", "main")
+PROVE = command(MP, "git merge-base --is-ancestor <tip> <commit>")
+DETACH = command(MP, "git checkout --detach <tip>")
+PUSH = command(MP, "git push origin HEAD:refs/heads/<workingBase>").replace("<workingBase>", "main")
+BACK = command(MP, "git checkout <branch>", "A refused push →").replace("<branch>", "feature")
+check("the fast merge never checks out, pulls or resets the base branch, never detaches at the shared ref, and never keeps the tip in a shell variable",
+      "git checkout <workingBase>" not in flat(MP) and "git pull" not in flat(MP) and "git reset --hard" not in flat(MP)
+      and "$tip" not in flat(MP) and "git checkout --detach origin/" not in flat(MP))
+def linked(repo):
+    """A second checkout of the same repository holding main, as a pool of linked worktrees does."""
+    path = os.path.join(fresh("linked"), "wt")
+    git(repo, "worktree", "add", "-q", path, "main")
+    return path
+def base_moved(repo, story):
+    """"Base moved" as merge-paths.md spells it: the fetch, the base recorded once as <tip>, the ancestry test."""
+    git(repo, "fetch", "-q", "origin")
+    tip = sh(repo, RECORD).stdout.strip()
+    return tip, sh(repo, PROVE.replace("<tip>", tip).replace("<commit>", story), check_rc=False).returncode == 0
+def detach(repo, tip, story):
+    return sh(repo, DETACH.replace("<tip>", tip).replace("<commit>", story), check_rc=False).returncode == 0
 bare, repo, story = setup()
-git(repo, "checkout", "-q", "main")
-unrelated = commit(repo, "notes.txt", "mine, not pushed\n", "an unrelated local commit")
-check("a local base ahead of its remote is caught before any merge (the count is not 0)", sh(repo, AHEAD).stdout.strip() == "1")
-tip = git(repo, "rev-parse", "HEAD")
+holder = linked(repo)
+check("(the old by-name checkout stops while another worktree holds the base)",
+      sh(repo, "git checkout main && git pull --ff-only", check_rc=False).returncode != 0)
+tip, proven = base_moved(repo, story)
+proven = proven and detach(repo, tip, story)
+git(repo, "merge", "-q", "--no-ff", "-m", "merge: I123", story)
+merge = git(repo, "rev-parse", "HEAD")
+pushed = sh(repo, PUSH, check_rc=False).returncode == 0
+git(repo, "fetch", "-q", "origin")
+check("with another worktree on the base, the fast merge lands from a detached HEAD: the base's new tip is the merge of the recorded tip and exactly the story commit",
+      proven and pushed and git(repo, "rev-parse", "origin/main") == merge and git(repo, "rev-parse", "%s^1" % merge) == tip
+      and git(repo, "rev-parse", "%s^2" % merge) == story and git(repo, "rev-parse", "--abbrev-ref", "HEAD") == "HEAD",
+      (proven, pushed, merge))
+check("... and the other worktree's checkout of the base is left alone", git(holder, "rev-parse", "HEAD") == tip)
+bare, repo, story = setup()
+linked(repo)
+tip, proven = base_moved(repo, story)
+detach(repo, tip, story)
 git(repo, "merge", "-q", "--no-ff", "-m", "merge: I123", story)
 other_author(bare, "the remote moves, so the push is refused")
-refused = sh(repo, "git push origin main", check_rc=False).returncode != 0
-parents = sh(repo, UNDO_CHECK).stdout.split()  # each command its own shell call, as a step runs them
-if parents == [tip, story]:
-    git(repo, "reset", "-q", "--hard", tip)
-check("a refused push is undone to the recorded tip: the merge is gone and the unrelated commit kept",
-      refused and parents == [tip, story] and git(repo, "rev-parse", "HEAD") == unrelated, (refused, parents))
+refused = sh(repo, PUSH, check_rc=False).returncode != 0
+sh(repo, BACK)  # each command its own shell call, as a step runs them
 git(repo, "fetch", "-q", "origin")
-check("(the old reset to the remote would have discarded it)",
-      sh(repo, "git merge-base --is-ancestor %s origin/main" % unrelated, check_rc=False).returncode != 0)
+check("a refused push goes back to the story branch: HEAD is the story commit, off the unpushed merge, nothing reset",
+      refused and git(repo, "rev-parse", "--abbrev-ref", "HEAD") == "feature" and git(repo, "rev-parse", "HEAD") == story
+      and git(repo, "rev-parse", "origin/feature") == story, refused)
+check("... and the fetch shows the base moved past the recorded tip, so the merge answers REFRESHED",
+      git(repo, "rev-parse", "origin/main") != tip)
+
+# a peer worktree OF THE SAME REPOSITORY lands and fetches between "Base moved" and the merge: linked worktrees
+# share refs/remotes, so its fetch moves origin/main under this checkout
+def peer_between(use_ref):
+    bare, repo, story = setup()
+    peer = linked(repo)
+    tip, proven = base_moved(repo, story)
+    commit(peer, "peer.txt", "peer\n", "a peer story lands meanwhile")
+    git(peer, "push", "-q", "origin", "main"); git(peer, "fetch", "-q", "origin")
+    shared_moved = git(repo, "rev-parse", "origin/main") != tip
+    if use_ref:  # the round-2 form: detach at the shared ref
+        sh(repo, "git checkout --detach origin/main")
+    else:
+        proven = proven and detach(repo, tip, story)
+    git(repo, "merge", "-q", "--no-ff", "-m", "merge: I123", story)
+    pushed = sh(repo, PUSH, check_rc=False).returncode == 0
+    if not pushed:
+        sh(repo, BACK)
+    git(repo, "fetch", "-q", "origin")
+    return proven, shared_moved, pushed, git(repo, "rev-parse", "origin/main") != tip
+proven, shared_moved, pushed, moved = peer_between(False)
+check("a peer worktree landing and fetching after the ancestry check: the merge sits on the recorded tip, the push is refused and the fetch shows the base moved (REFRESHED), never a landing",
+      proven and shared_moved and not pushed and moved, (proven, shared_moved, pushed, moved))
+proven, shared_moved, pushed, moved = peer_between(True)
+check("(detaching at origin/<workingBase>, which the peer's fetch had moved, merged onto its unchecked tip and the push landed)",
+      proven and shared_moved and pushed, (proven, shared_moved, pushed))
+
+# --- sync, a new story branch and a new epic branch, while another worktree holds the base ---------
+SYNC = command(os.path.join(ROOT, "skills/sync-base/SKILL.md"), "git fetch origin && git checkout --detach").replace("<workingBase>", "main")
+BF = os.path.join(ROOT, "skills/branch-feature/SKILL.md")
+BF_TEXT = flat(BF)
+UPSTREAM = "git config branch.<b>.remote; git config branch.<b>.merge"  # what the skill's upstream settings are
+def upstream(repo, branch):
+    return sh(repo, UPSTREAM.replace("<b>", branch), check_rc=False).stdout.split()
+def cut_and_push(repo, text, branch, base):
+    """The creation step as `text` spells it, each command its own call: the cut, then its first push.
+    Gives the branch's upstream settings after the cut and after the push."""
+    sh(repo, spelled(text, "git checkout --no-track -b <new-branch>").replace("<new-branch>", branch).replace("<working base>", base))
+    after_cut = upstream(repo, branch)
+    sh(repo, spelled(text, "git push", "## Steps").replace("<new-branch>", branch))
+    return after_cut, upstream(repo, branch)
+def own_upstream(cut, pushed, branch):
+    return cut == [] and pushed == ["origin", "refs/heads/%s" % branch]
+EPIC = command(os.path.join(ROOT, "skills/build-item/references/parallel-building.md"), "git fetch origin && git push origin origin/<from>")
 bare, repo, story = setup()
-git(repo, "checkout", "-q", "main")
-check("a base level with its remote passes the guard", sh(repo, AHEAD).stdout.strip() == "0")
+linked(repo)
+other_author(bare, "the base moves on")
+sh(repo, SYNC)
+check("the sync returns the checkout to the base detached at its fresh remote tip, beside a worktree holding it",
+      git(repo, "rev-parse", "--abbrev-ref", "HEAD") == "HEAD" and git(repo, "rev-parse", "HEAD") == git(repo, "rev-parse", "origin/main"))
+sh(repo, EPIC.replace("<from>", "main").replace("<epic branch>", "jane/26-11-26/epic-42-export"))
+git(repo, "fetch", "-q", "origin")
+check("a new epic branch is created on the remote from the base without being checked out here",
+      git(repo, "rev-parse", "origin/jane/26-11-26/epic-42-export") == git(repo, "rev-parse", "origin/main")
+      and git(repo, "rev-parse", "--abbrev-ref", "HEAD") == "HEAD"
+      and sh(repo, "git rev-parse --verify --quiet refs/heads/jane/26-11-26/epic-42-export", check_rc=False).returncode != 0)
+cut, pushed = cut_and_push(repo, BF_TEXT, "jane/26-11-26/I43-next", "jane/26-11-26/epic-42-export")
+check("the next story branch is cut from the remote epic branch, never from a local checkout of it, and tracks nothing after the cut (never the shared base)",
+      git(repo, "rev-parse", "--abbrev-ref", "HEAD") == "jane/26-11-26/I43-next"
+      and git(repo, "rev-parse", "HEAD") == git(repo, "rev-parse", "origin/jane/26-11-26/epic-42-export") and cut == [], cut)
+check("... and the creation step's own push publishes it with its own upstream: origin, refs/heads/<the new branch>",
+      own_upstream(cut, pushed, "jane/26-11-26/I43-next")
+      and git(bare, "rev-parse", "jane/26-11-26/I43-next") == git(repo, "rev-parse", "HEAD"), pushed)
+bare, repo, story = setup()
+no_u = BF_TEXT.replace("`git push -u origin <new-branch>`", "`git push origin <new-branch>`")
+cut, pushed = cut_and_push(repo, no_u, "jane/26-11-26/I44-new", "main")
+check("(mutation: without -u in the creation push, the new branch has no upstream of its own, and that check fails)",
+      no_u != BF_TEXT and not own_upstream(cut, pushed, "jane/26-11-26/I44-new"), pushed)
+git(repo, "checkout", "-q", "--detach", "origin/main")
+sh(repo, "git checkout -q -b tracked origin/main")
+check("(the old cut made the shared base the story branch's upstream)", upstream(repo, "tracked") == ["origin", "refs/heads/main"])
+# the re-run: origin asked for exactly the branch, every time, then the pull; in a full clone and in one tracking only the base
+RERUN = spelled(BF_TEXT, "if git ls-remote")
+def rerun(clone, branch, text=RERUN):
+    """The re-run's one command as spelled (or an in-memory edit of it), then its pull:
+    True when it succeeded, origin holds the branch at this commit, and the upstream settings name it."""
+    ran = sh(clone, text.replace("<branch>", branch), check_rc=False).returncode == 0
+    pulled = ran and sh(clone, "git pull -q --ff-only", check_rc=False).returncode == 0
+    there = sh(clone, "git ls-remote origin refs/heads/%s" % branch, check_rc=False).stdout.split()[:1] == [git(clone, "rev-parse", branch)]
+    return pulled and there and upstream(clone, branch) == ["origin", "refs/heads/%s" % branch]
+check("the re-run asks origin for the exact ref, never a bare name", "ls-remote --exit-code origin refs/heads/<branch>" in RERUN, RERUN)
+for single_branch in (False, True):
+    kind = "a clone tracking only the base" if single_branch else "a full clone"
+    bare, repo, story = setup()
+    clone = fresh_clone(bare, single=single_branch)
+    git(clone, "fetch", "-q", "origin", "+refs/heads/feature:refs/heads/feature")  # the story branch, here and on origin
+    git(clone, "config", "branch.feature.remote", "origin"); git(clone, "config", "branch.feature.merge", "refs/heads/main")  # left tracking the base
+    git(clone, "checkout", "-q", "feature")
+    check("%s: a story branch left tracking the base and on origin gets its own upstream from the config sets" % kind,
+          rerun(clone, "feature") and git(bare, "rev-parse", "feature") == story, upstream(clone, "feature"))
+    git(clone, "checkout", "-q", "-b", "only-here")
+    check("%s: a story branch only here is published by the push, which sets its upstream" % kind,
+          rerun(clone, "only-here") and git(bare, "rev-parse", "only-here") == story, upstream(clone, "only-here"))
+    if single_branch:
+        check("(the old `git branch -u origin/<branch>` fails in a clone tracking only the base)",
+              sh(clone, "git branch -u origin/feature feature", check_rc=False).returncode != 0)
+def deleted_and_pruned():
+    """The story branch's upstream settings name origin's copy, which was deleted and then pruned here."""
+    bare, repo, story = setup()
+    git(bare, "update-ref", "-d", "refs/heads/feature")
+    git(repo, "fetch", "-q", "--prune", "origin")
+    gone = sh(repo, "git rev-parse --verify --quiet refs/remotes/origin/feature", check_rc=False).returncode != 0
+    return repo, gone and upstream(repo, "feature") == ["origin", "refs/heads/feature"]
+repo, premise = deleted_and_pruned()
+check("upstream settings still naming a remote branch that was deleted and pruned: the re-run pushes it back and the pull succeeds",
+      premise and rerun(repo, "feature"), upstream(repo, "feature"))
+repo, premise = deleted_and_pruned()
+old_skip = 'git config branch.<branch>.merge | grep -qx refs/heads/<branch> || ' + RERUN  # the old order: settings first
+check("(mutation: trusting matching settings skips the remote check, so the pull fails and that check fails)",
+      premise and not rerun(repo, "feature", old_skip))
+def only_archived():
+    """A story branch only here, while origin holds archive/<the same name>."""
+    bare, repo, story = setup()
+    git(repo, "checkout", "-q", "-b", "jane/26-11-26/I45-later")
+    git(repo, "push", "-q", "origin", "HEAD:refs/heads/archive/jane/26-11-26/I45-later")
+    return bare, repo
+bare, repo = only_archived()
+check("only archive/<branch> on origin is treated as absent: the re-run pushes the branch itself and points its upstream there",
+      rerun(repo, "jane/26-11-26/I45-later"), upstream(repo, "jane/26-11-26/I45-later"))
+bare, repo = only_archived()
+unanchored = RERUN.replace("--exit-code origin refs/heads/<branch>", "--exit-code --heads origin <branch>")
+check("(mutation: the bare name matches archive/<branch>, so nothing is pushed and that check fails)",
+      unanchored != RERUN and not rerun(repo, "jane/26-11-26/I45-later", unanchored))
 
 # --- the excluded-paths re-route: one shell call, the named branch rebased, only its ref pushed ----
 REROUTE = command(RS, "git fetch origin && pushed=$(git rev-parse --verify --quiet refs/remotes/origin/<branch>)")
@@ -321,16 +487,13 @@ check("... and its own instruction, a plain first push, moves and publishes it",
       and git(repo, "rev-parse", "origin/other") != git(repo, "rev-parse", "other"))
 
 # --- wrong-branch recovery: fetch into a tracking ref, then check the story branch out ----------
-BI = os.path.join(ROOT, "skills/build-item/SKILL.md")
-FETCH = command(BI, 'git fetch origin "+refs/heads/<branch>:refs/remotes/origin/<branch>"')
-FROM_LOCAL = command(BI, "git checkout <branch>")
-FROM_REMOTE = command(BI, "git checkout -b <branch> origin/<branch> && git config")
-def fresh_clone(bare, single=True):
-    clone = fresh("single" if single else "full")
-    git(clone, "clone", "-q", *((["--single-branch", "--branch", "main"] if single else []) + [bare, "."]))
-    return clone
+BI = os.path.join(ROOT, "skills/run-workflow/references/workflow-runner.md")  # build-item points here for it
+AT = "send the same request again:"
+FETCH = command(BI, 'git fetch origin "+refs/heads/<branch>:refs/remotes/origin/<branch>"', AT)
+FROM_LOCAL = command(BI, "git checkout <branch>", AT)
+FROM_REMOTE = command(BI, "git checkout -b <branch> origin/<branch> && git config", AT)
 def recover(clone, branch="feature"):
-    """The recovery as build-item writes it: the tracking-ref fetch, then the checkout that fits."""
+    """The recovery as the runner's reference writes it for build-item: the tracking-ref fetch, then the checkout that fits."""
     sh(clone, FETCH.replace("<branch>", branch), check_rc=False)
     here = sh(clone, "git rev-parse --verify --quiet refs/heads/%s" % branch, check_rc=False).returncode == 0
     sh(clone, (FROM_LOCAL if here else FROM_REMOTE).replace("<branch>", branch))

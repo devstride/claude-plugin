@@ -313,7 +313,7 @@
       "calledBy": [
         "hooks/presence.py"
       ],
-      "unset": "no command is named (no block, an empty block, or one with only intervalMinutes): the built-in reporter sends each report to DevStride with the API key the machine's DevStride connection carries, and nothing runs on a machine whose connection has no key; a blank command, or presence set to null, runs nothing",
+      "unset": "no command is named (no block, an empty block, or one with only intervalMinutes): the built-in reporter sends each report to DevStride with the API key the machine's DevStride connection carries, and else the session reporter credential a browser sign-in sets up, and nothing runs with neither; a blank command, or presence set to null, runs nothing",
       "contract": "skills/setup/references/session-presence.md",
       "since": "3.42.0"
     },
@@ -2003,7 +2003,7 @@
         "object",
         "null"
       ],
-      "description": "how every session reports its live status (session start, prompts, tool uses and finished turns, throttled; a keeper every intervalMinutes; session end). Absent, empty or without a command: the built-in reporter sends each report to DevStride with the API key the machine's DevStride connection carries (nothing runs where that connection has no key). With a command: the repository's own command runs instead and decides what a report means. null: off for this repository, the built-in reporter and any command alike; a blank command also runs nothing. DEVSTRIDE_PRESENCE=0 in the environment switches a whole machine off",
+      "description": "how every session reports its live status (session start, prompts, tool uses and finished turns, throttled; a keeper every intervalMinutes; session end). Absent, empty or without a command: the built-in reporter sends each report to DevStride with the API key the machine's DevStride connection carries (else the session reporter credential a browser sign-in sets up; nothing runs with neither). With a command: the repository's own command runs instead and decides what a report means. null: off for this repository, the built-in reporter and any command alike; a blank command also runs nothing. DEVSTRIDE_PRESENCE=0 in the environment switches a whole machine off",
       "since": "3.42.0"
     },
     {

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """hooks/presence-report.py — the built-in session reporter: one report to DevStride, with the API
-key the machine's DevStride connection already carries. hooks/presence.py runs it for every session
+key the machine's DevStride connection already carries, else with the machine's session reporter
+credential (skills/build-item/scripts/reporter_credential.py). hooks/presence.py runs it for every session
 whose repository names no presence command of its own (skills/setup/references/session-presence.md).
 
   (no argument)  send the report the PRESENCE_* variables describe: one call of the tool
@@ -9,14 +10,21 @@ whose repository names no presence command of its own (skills/setup/references/s
                  or nothing to send (no session id, an unknown event). Exit 3: refused for now (the
                  server has no such tool, HTTP 401 or 403, an address that is not DevStride's): the
                  hook waits 30 minutes. Exit 4: a failure that may pass (unreachable, a timeout,
-                 HTTP 429 or 5xx, a redirect, any other error answer, no key found just now, or
-                 anything unexpected): the hook waits 2 minutes.
-  check          no network, never a value. Line 1: `AGENT CONNECTION: READY (key from …)` or
+                 HTTP 429 or 5xx, a redirect, any other error answer, no key found just now, a
+                 session reporter credential DevStride no longer knows, now set aside so the next
+                 DevStride skill registers a new one, or anything unexpected): the hook waits 2
+                 minutes.
+  check          no network, never a value. Line 1: `AGENT CONNECTION: READY (key from …)`,
+                 `AGENT CONNECTION: READY (session reporter, registered for <username>)` or
                  `AGENT CONNECTION: NOT READY (…)`, the latter followed by a `Fix: …` line. Then
                  `PRESENCE: ON (built-in reporter | repository command)` or `PRESENCE: OFF (<reason>)`,
                  then `INTERVAL: <n> minute(s)` (`INTERVAL: none` when off). Always exit 0.
   prove          sends a start then an end for a throwaway session and prints one `PROOF: …` line.
                  Run only after the person's typed yes. Exit 0 only for `PROOF: ok`.
+  identity       prints `KEY USER: <username>`, the DevStride member the reporting key belongs to: for
+                 the session reporter credential, the name stored with it (no network); for any
+                 other key, the username one `whoami` call made with that key answers. `KEY USER:
+                 unknown (<reason>)` when it cannot be told. Never a key or secret. Exit 0.
 
 What is sent, and nothing else: event, sessionId, state, machine, label (the session's own name),
 branch, checkout (the folder's base name, never a path), item, pluginVersion, intervalMinutes,
@@ -30,8 +38,8 @@ own title at the next prompt; once the session's name is the one asked for, or t
 set it, every report carries the request's time as `renameApplied`, so the server stops asking. A recorded answer with no request
 removes the kept one, and so does an end; any other answer keeps it. Keeping it never changes the
 exit code. The key is found by skills/build-item/scripts/devstride_connection.py and
-goes only to a DevStride API host; it is never printed, logged, or taken from or put on a command
-line. python3 and the standard library only.
+goes only to a DevStride API host; a secret is never printed, logged, or taken from or put on a
+command line (a key's public id alone opens nothing). python3 and the standard library only.
 """
 import os
 import re
@@ -67,7 +75,7 @@ CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 LONG, NAME, SHORT = 500, 200, 64
 FIX = "Fix: /devstride:setup connect"
 SOURCES = {"environment": "key from the environment", "connection-project": "key from the devstride connection, this project",
-           "connection-user": "key from the devstride connection, user level"}
+           "connection-user": "key from the devstride connection, user level", "session-reporter": "session reporter"}
 EXIT_REFUSED, EXIT_TRANSIENT = 3, 4
 
 
@@ -122,16 +130,59 @@ def places(environ):
 
 
 def credentials(environ):
-    return connection.credentials(environ, connection.config_file(environ), places(environ)[1])
+    return connection.credentials(environ, connection.config_file(environ), places(environ)[1], reporter=True)
 
 
-def deliver(body, creds):
-    """Send one report; (the exit code the hook reads, the server's answer or None)."""
+def reporter_user(environ):
+    """The username stored with the session reporter credential, or None."""
+    try:
+        import reporter_credential
+        stored = reporter_credential.read(environ)
+    except Exception:
+        return None
+    return clean(stored["username"], NAME) if stored else None
+
+
+# The hosted MCP address takes the organization's slug from the reporter's headers, so it checks no
+# credential before the tool runs: a refused key comes back as the tool's own error text
+# (packages/mcp/src/describe-error.ts, registry.ts), not as an HTTP 401. The API's authorizer refuses a
+# key it does not know with the gateway's bare body, "Unauthorized" or "Forbidden", which the tool error
+# opens with, followed by the organization line; an API refusal of a known key names its reason instead.
+# A session reporter key asks for only the one route its policy allows, so for it a bare gateway refusal
+# means DevStride no longer accepts the key.
+TOOL_UNAUTHORIZED = re.compile(r"^(DevStride 401\b|(Unauthorized|Forbidden) \u2014 this session sends every request to\b)")
+
+
+def unauthorized(error):
+    """Whether DevStride said this key is not one it knows: HTTP 401 on the address, or the tool error a
+    401 or the gateway's bare refusal opens with. An HTTP 403, or a refusal that names its reason, is
+    not: the key is known, and the refusal is about what it asked for."""
+    if isinstance(error, connection.Refused):
+        return error.code == 401
+    return isinstance(error, connection.Unavailable) and bool(TOOL_UNAUTHORIZED.match(error.detail or ""))
+
+
+def drop_refused_reporter(creds, error, environ):
+    """Set the session reporter credential aside when DevStride no longer knows it; True when it was."""
+    if creds.get("source") != "session-reporter" or not unauthorized(error):
+        return False
+    import reporter_credential
+    return reporter_credential.set_aside(environ)
+
+
+def deliver(body, creds, environ=None):
+    """Send one report; (the exit code the hook reads, the server's answer or None). A session
+    reporter credential DevStride no longer knows is set aside, so the machine asks to register again
+    instead of staying off the Fleet for good."""
     try:
         answer = connection.call_tool(TOOL, body, creds, timeout=TIMEOUT, attempts=1)
-    except (connection.Absent, connection.Refused):
-        return EXIT_REFUSED, None
-    except connection.Problem:
+    except connection.Problem as error:
+        # a credential set aside is not a refusal to wait out: the next DevStride skill registers a new
+        # one, and a 30-minute quiet would keep running sessions off the Fleet after it does
+        if drop_refused_reporter(creds, error, os.environ if environ is None else environ):
+            return EXIT_TRANSIENT, None
+        if isinstance(error, (connection.Absent, connection.Refused)):
+            return EXIT_REFUSED, None
         return EXIT_TRANSIENT, None
     outcome = answer.get("outcome") if isinstance(answer, dict) else None
     return (0, answer) if outcome in OUTCOMES else (EXIT_TRANSIENT, None)
@@ -180,28 +231,48 @@ def report(environ):
     except connection.Problem:
         return EXIT_TRANSIENT  # no key just now (a file being rewritten): the keeper leaves if it stays so
     body = with_rename_applied(body)
-    code, answer = deliver(body, creds)
+    code, answer = deliver(body, creds, environ)
     if code == 0 or body["event"] == "end":  # an ended session waits on no rename, whatever the answer
         keep_rename(body, answer)
     return code
 
 
+def reporter_fix(unsafe):
+    """The Fix line for a session reporter credential that cannot be read safely: only a file, or a
+    folder, that is too open is tightened; a link, a file or folder another user owns, or one that
+    cannot be read is removed (never changed through a link: for a linked folder, the link itself),
+    so the next DevStride skill run sets up a fresh one."""
+    if unsafe.reason == "mode too open":
+        return "Fix: chmod 600 %s" % unsafe.path
+    if unsafe.reason == "folder open to others":
+        return "Fix: chmod 700 %s" % os.path.dirname(unsafe.path)
+    if unsafe.reason in ("folder not yours", "folder is a link"):
+        return "Fix: remove %s; the next DevStride skill run sets up a new one" % os.path.dirname(unsafe.path)
+    return "Fix: remove %s; the next DevStride skill run sets up a new one" % unsafe.path
+
+
 def check(environ):
     top, where = places(environ)
     path = connection.config_file(environ)
-    word = connection.readiness(environ, path, where)
-    if word in SOURCES:
+    word = connection.readiness(environ, path, where, reporter=True)
+    if word == "session-reporter":
+        print("AGENT CONNECTION: READY (session reporter, registered for %s)" % (reporter_user(environ) or "unknown"))
+    elif word in SOURCES:
         print("AGENT CONNECTION: READY (%s)" % SOURCES[word])
     elif word == "bad-address":
         print("AGENT CONNECTION: NOT READY (DEVSTRIDE_BASE_URL is not a DevStride API address)")
         print("Fix: unset DEVSTRIDE_BASE_URL, or set it to https://api.devstride.com")
     else:
-        unsafe = connection.unsafe_reason(environ, path, where) if word == "unsafe-config" else None
-        if unsafe is not None:
+        unsafe = connection.unsafe_reason(environ, path, where, reporter=True) if word == "unsafe-config" else None
+        if unsafe is not None and unsafe.kind == "reporter":
+            print("AGENT CONNECTION: NOT READY (the session reporter credential cannot be read safely: %s)" % unsafe.reason)
+            print(reporter_fix(unsafe))
+        elif unsafe is not None:
             print("AGENT CONNECTION: NOT READY (Claude Code's configuration file cannot be read safely: %s)" % unsafe.reason)
+            print(FIX)
         else:
             print("AGENT CONNECTION: NOT READY (no API key: browser sign-in only, or no devstride connection)")
-        print(FIX)
+            print(FIX)
     conf, reason = presence_settings.effective(top, presence.read_json, environ, lambda: word in SOURCES)
     if conf:
         print("PRESENCE: ON (%s)" % ("repository command" if conf["mode"] == "command" else "built-in reporter"))
@@ -247,6 +318,31 @@ def prove(environ):
     return 0
 
 
+def identity(environ):
+    """Who the reporting key belongs to: the stored name for a session reporter credential, else
+    one `whoami` call made with the key."""
+    try:
+        creds = credentials(environ)
+    except connection.Problem:
+        print("KEY USER: unknown (no key)")
+        return 0
+    if creds["source"] == "session-reporter":
+        print("KEY USER: %s" % (reporter_user(environ) or "unknown (the credential names no member)"))
+        return 0
+    try:
+        answer = connection.call_tool("whoami", {"include": ["identity"]}, creds, timeout=TIMEOUT, attempts=1)
+    except connection.Refused:
+        print("KEY USER: unknown (the key was refused)")
+        return 0
+    except connection.Problem:
+        print("KEY USER: unknown (DevStride could not be asked)")
+        return 0
+    who = answer.get("identity") if isinstance(answer, dict) else None
+    name = clean(who.get("username"), NAME) if isinstance(who, dict) and isinstance(who.get("username"), str) else None
+    print("KEY USER: %s" % (name or "unknown (the answer named no member)"))
+    return 0
+
+
 def unloaded(argv):
     """What each mode answers when the plugin's own helpers could not load on this system."""
     if argv == ["check"]:
@@ -258,6 +354,9 @@ def unloaded(argv):
     if argv == ["prove"]:
         print("PROOF: FAILED (the plugin's helpers could not load on this system: %s)" % UNLOADED)
         return 1
+    if argv == ["identity"]:
+        print("KEY USER: unknown (the plugin's helpers could not load on this system: %s)" % UNLOADED)
+        return 0
     return EXIT_TRANSIENT if not argv else 2
 
 
@@ -271,7 +370,9 @@ def main(argv):
             return check(os.environ)
         if argv == ["prove"]:
             return prove(os.environ)
-        print("usage: presence-report.py [check|prove]", file=sys.stderr)
+        if argv == ["identity"]:
+            return identity(os.environ)
+        print("usage: presence-report.py [check|prove|identity]", file=sys.stderr)
         return 2
     except Exception:
         return EXIT_TRANSIENT if not argv else 1  # nothing was sent: never recorded as a report that went

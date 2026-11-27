@@ -2,8 +2,8 @@
 """The one place this plugin finds a machine's DevStride API key, and the one way it calls a
 DevStride tool outside the model — standard library only, importable, no command line.
 
-There is one DevStride credential per agentic machine: the API key its DevStride connection
-carries. The session reporter (hooks/presence-report.py) and the release clearance provider
+An agentic machine reports with one DevStride credential: the API key its DevStride connection
+carries, else (for the session reporter only) its session reporter credential. The session reporter (hooks/presence-report.py) and the release clearance provider
 (skills/release/scripts/clearance_core.py) both resolve it here, in one order:
 
   1. the environment: DEVSTRIDE_API_KEY, DEVSTRIDE_API_SECRET, DEVSTRIDE_ORG_ID (and the optional
@@ -14,11 +14,16 @@ carries. The session reporter (hooks/presence-report.py) and the release clearan
      configuration file, first under the session's own project (each place of `project_places`, in
      order), then at user level. Its address and its three required headers are taken together
      from that one entry, never mixed with another source.
+  4. only for a caller that asks (`reporter=True`: the session reporter and its readiness check),
+     the machine's session reporter credential (reporter_credential.py): a narrow key DevStride
+     refuses on every route but the session presence report. A full key always wins over it, and
+     the release clearance provider never asks for it.
 
 The first step that yields a key, a secret and an organization id wins. Rules for every source: the
 key goes only to an https://api(-<stage>).devstride.(com|dev) host, redirects are refused, every
 call is bounded in time, and no secret is ever printed, logged, put in an error, placed on a
-command line or added to a child's environment. Nothing here writes a file.
+command line or added to a child's environment. Nothing here writes a file (reporter_credential.py
+writes the reporter's own).
 
 DEVSTRIDE_PLUGIN_TEST_URL (http://127.0.0.1:<port>) exists for the tests only: it replaces the
 base address for a key from the environment or a credentials file, disables proxies, and makes
@@ -44,7 +49,7 @@ CONFIG_LIMIT = 16 * 1048576
 HEADERS = {"DEVSTRIDE_API_KEY": "x-devstride-api-key", "DEVSTRIDE_API_SECRET": "x-devstride-api-secret",
            "DEVSTRIDE_ORG_ID": "x-devstride-organization-id", "DEVSTRIDE_ORG_SLUG": "x-devstride-organization-slug"}
 # readiness words: where a complete key was found, or why none was
-READY_WORDS = ("environment", "file", "connection-project", "connection-user")
+READY_WORDS = ("environment", "file", "connection-project", "connection-user", "session-reporter")
 
 
 class Problem(Exception):
@@ -330,9 +335,21 @@ def read_credentials_file(path, values):
     return filled
 
 
-def credentials(environ, config_path, places, files=()):
+def reporter_key(environ):
+    """The session reporter credential's values under the five names, or None. Raises UnsafeFile."""
+    import reporter_credential  # imported only by a caller that asks for this source
+    stored = reporter_credential.read(environ)
+    if not stored:
+        return None
+    return {"DEVSTRIDE_API_KEY": stored["apiKey"], "DEVSTRIDE_API_SECRET": stored["secret"],
+            "DEVSTRIDE_ORG_ID": stored["organizationId"], "DEVSTRIDE_ORG_SLUG": stored["organizationSlug"],
+            "DEVSTRIDE_BASE_URL": environ.get("DEVSTRIDE_BASE_URL") or ""}
+
+
+def credentials(environ, config_path, places, files=(), reporter=False):
     """The machine's DevStride key, by the one resolution order: {the five names, "base", "test",
-    "source"}. Raises Missing, UnsafeFile or BadAddress; never returns a partial key."""
+    "source"}. Raises Missing, UnsafeFile or BadAddress; never returns a partial key. `reporter`
+    adds the session reporter credential as the last source."""
     try:
         test, bad_test = test_url(environ), None
     except BadAddress as error:
@@ -350,6 +367,13 @@ def credentials(environ, config_path, places, files=()):
             problem = Missing(missing)
             problem.unsafe = error
             raise problem
+        if not entry and reporter:
+            try:
+                entry, source = reporter_key(environ), "session-reporter"
+            except UnsafeFile as error:
+                problem = Missing(missing)
+                problem.unsafe = error
+                raise problem
         if not entry:
             raise Missing(missing)
         values = {name: entry.get(name) or "" for name in CREDENTIAL_NAMES}
@@ -363,13 +387,13 @@ def credentials(environ, config_path, places, files=()):
     return dict(values, base=base, test=bool(test), source=source)
 
 
-def readiness(environ, config_path, places, files=()):
-    """One fixed word, never a value: `environment`, `file`, `connection-project` or
-    `connection-user` (where a complete key was found), else `unsafe-config` (Claude Code's
-    configuration file cannot be read safely), `bad-address` (a key, but an address that is not a
-    DevStride API host) or `no-key`."""
+def readiness(environ, config_path, places, files=(), reporter=False):
+    """One fixed word, never a value: `environment`, `file`, `connection-project`,
+    `connection-user` or (with `reporter`) `session-reporter` (where a complete key was found), else
+    `unsafe-config` (Claude Code's configuration file, or the reporter's own, cannot be read safely),
+    `bad-address` (a key, but an address that is not a DevStride API host) or `no-key`."""
     try:
-        return credentials(environ, config_path, places, files)["source"]
+        return credentials(environ, config_path, places, files, reporter)["source"]
     except Missing as error:
         return "unsafe-config" if getattr(error, "unsafe", None) is not None else "no-key"
     except BadAddress:
@@ -378,10 +402,11 @@ def readiness(environ, config_path, places, files=()):
         return "no-key"
 
 
-def unsafe_reason(environ, config_path, places):
-    """Why the configuration file cannot be read safely (an UnsafeFile), else None."""
+def unsafe_reason(environ, config_path, places, reporter=False):
+    """Why the configuration file (or, with `reporter`, the reporter's own) cannot be read safely
+    (an UnsafeFile), else None."""
     try:
-        credentials(environ, config_path, places)
+        credentials(environ, config_path, places, reporter=reporter)
     except Missing as error:
         return getattr(error, "unsafe", None)
     except Problem:

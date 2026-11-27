@@ -9,7 +9,10 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"; RP="$ROOT/hooks/presence-report.py"
 FAIL=0; ok() { echo "  ok   $1"; }; bad() { echo "  FAIL $1"; FAIL=1; }
 WORK="$(mktemp -d)"   # every server's pid goes in a file: `server` runs in a subshell, which a variable would not leave
 trap 'for p in $(cat "$WORK/pids" 2>/dev/null); do kill "$p" 2>/dev/null; done; chmod -R u+w "$WORK" 2>/dev/null; rm -rf "$WORK"' EXIT
-export HOME="$WORK/home" XDG_CACHE_HOME="$WORK/cache" CLAUDE_CONFIG_DIR="$WORK/claude"; mkdir -p "$HOME" "$CLAUDE_CONFIG_DIR" "$WORK/dir"
+export HOME="$WORK/home" XDG_CACHE_HOME="$WORK/cache" XDG_CONFIG_HOME="$WORK/config" CLAUDE_CONFIG_DIR="$WORK/claude"; mkdir -p "$HOME" "$CLAUDE_CONFIG_DIR" "$WORK/dir"
+# on native Windows the session reporter credential lives under %APPDATA%, which wins over XDG_CONFIG_HOME:
+# point it at the same scratch folder, so no case ever writes into the real profile and every path is one
+export APPDATA="$XDG_CONFIG_HOME"
 export PYTHONDONTWRITEBYTECODE=1   # a case imports the plugin's modules: never leave compiled files in the tree
 export GIT_CONFIG_GLOBAL="$WORK/gitconfig" GIT_CONFIG_NOSYSTEM=1; printf '[user]\n\tname = t\n\temail = t@t\n' > "$GIT_CONFIG_GLOBAL"
 unset DEVSTRIDE_API_KEY DEVSTRIDE_API_SECRET DEVSTRIDE_ORG_ID DEVSTRIDE_ORG_SLUG DEVSTRIDE_BASE_URL DEVSTRIDE_PRESENCE \
@@ -346,6 +349,222 @@ assert r.request_of({"outcome": "recorded", "rename": {"name": "x", "at": "t" * 
 PY
 then ok "(10b) the kept request lives owner-only; a directory open to others, a linked directory or a linked request is never read, written or removed through; a bad session id, a non-recorded answer or an over-long time is no request"
 else bad "(10b) the rename helper's file safety"; fi
+
+# (11) the session reporter credential: made by prepare and finish, never printed; the reporter's last
+#      source, after the environment and the connection; refused when unsafe; never read by release clearance
+RC_SCRIPT="$ROOT/skills/build-item/scripts/reporter_credential.py"; CONF="$XDG_CONFIG_HOME/devstride-plugin"
+nokey; noconfig
+# on native Windows too (where %APPDATA% wins) the credential these cases write is the scratch one
+if python3 -c 'import os, sys; sys.path.insert(0, sys.argv[1]); import portable, reporter_credential as rc; portable.IS_WINDOWS = True; assert rc.folder() == sys.argv[2], rc.folder()' \
+     "$ROOT/skills/build-item/scripts" "$CONF" 2>/dev/null; then ok "(11) the credential folder is the scratch one, as Windows would resolve it too"
+else bad "(11) as Windows resolves it, the credential folder is not the scratch one: APPDATA must point at it"; fi
+S0="$(python3 "$RC_SCRIPT" status 2>&1)"
+python3 "$RC_SCRIPT" finish --key-id k --org-id o --org-slug s --username u >/dev/null 2>&1; NOPEND=$?
+PREP="$(DEVSTRIDE_MACHINE_NAME="Jane's Mac" python3 "$RC_SCRIPT" prepare 2>&1)"; printf '%s\n' "$PREP" >> "$ALL"
+S1="$(python3 "$RC_SCRIPT" status 2>&1)"
+python3 "$RC_SCRIPT" finish --key-id "k-rep" --org-id "o-rep" --org-slug "acme" --username $'bad\nname' >/dev/null 2>&1; BADVAL=$?
+FIN="$(python3 "$RC_SCRIPT" finish --key-id "k-rep" --org-id "o-rep" --org-slug "acme" --username "jane" 2>&1)"; printf '%s\n' "$FIN" >> "$ALL"
+S2="$(python3 "$RC_SCRIPT" status 2>&1)"
+if [ "$S0" = NONE ] && [ "$NOPEND" = 2 ] && [ "$S1" = PENDING ] && [ "$BADVAL" = 2 ] && [ "$S2" = READY ] \
+   && [ "$FIN" = "REPORTER: READY (Session reporter · jane-s-mac)" ] && python3 - "$PREP" "$CONF" "$ALL" <<'PY'
+import hashlib, json, os, re, stat, sys
+prep, conf, all_out = sys.argv[1], sys.argv[2], open(sys.argv[3]).read()
+lines = prep.splitlines()
+assert len(lines) == 2 and re.match(r"^FINGERPRINT: [0-9a-f]{64}$", lines[0]) and lines[1] == "MACHINE: jane-s-mac", lines
+assert stat.S_IMODE(os.stat(conf).st_mode) == 0o700
+path = os.path.join(conf, "session-reporter.json")
+assert stat.S_IMODE(os.stat(path).st_mode) == 0o600
+assert not os.path.exists(os.path.join(conf, "session-reporter.pending.json")), "the pending secret is moved, not copied"
+stored = json.load(open(path))
+assert stored == dict(stored, apiKey="k-rep", organizationId="o-rep", organizationSlug="acme", username="jane", machine="jane-s-mac")
+assert hashlib.sha256(stored["secret"].encode()).hexdigest() == lines[0].split(": ")[1], "the fingerprint is the secret's"
+assert stored["secret"] not in all_out, "the secret is never printed"
+assert sorted(os.listdir(conf)) == ["session-reporter.json"], "no temporary file is left"
+PY
+then ok "(11a) prepare prints only the fingerprint and the machine; finish moves the pending secret into an owner-only file (0600 in 0700) with the answer; status says NONE, PENDING, READY; a missing pending secret or a malformed value is refused; the secret is never printed"
+else bad "(11a) s0=$S0 nopend=$NOPEND s1=$S1 bad=$BADVAL s2=$S2 fin=$FIN prep=$PREP"; fi
+if python3 - "$ROOT" "$WORK" "$CONF/session-reporter.json" <<'PY'
+import json, os, shutil, sys
+sys.path.insert(0, os.path.join(sys.argv[1], "skills/build-item/scripts"))
+import devstride_connection as c
+work, stored = sys.argv[2], sys.argv[3]
+none = os.path.join(work, "absent.json")
+env = {"XDG_CONFIG_HOME": os.path.join(work, "config")}
+try:
+    c.credentials(env, none, [])
+    raise AssertionError("no caller but the reporter reads the reporter credential")
+except c.Missing:
+    pass
+got = c.credentials(env, none, [], reporter=True)
+assert got["source"] == "session-reporter" and got["DEVSTRIDE_API_KEY"] == "k-rep" and got["DEVSTRIDE_ORG_SLUG"] == "acme", got
+import hashlib
+secret = json.load(open(stored))["secret"]
+assert got["DEVSTRIDE_API_SECRET"] == secret, "the stored secret itself is what is sent"
+assert got["DEVSTRIDE_API_SECRET"] != hashlib.sha256(secret.encode()).hexdigest(), "never its fingerprint"
+assert got["DEVSTRIDE_ORG_ID"] == "o-rep", "the registered organization id is what is sent"
+assert got["base"] == "https://api.devstride.com"
+assert c.readiness(env, none, [], reporter=True) == "session-reporter" and c.readiness(env, none, []) == "no-key"
+full = dict(env, DEVSTRIDE_API_KEY="a", DEVSTRIDE_API_SECRET="b", DEVSTRIDE_ORG_ID="c")
+assert c.credentials(full, none, [], reporter=True)["source"] == "environment", "a full key wins"
+entry = {"url": "https://api.devstride.com/mcp", "headers": {"X-DevStride-Api-Key": "ek", "X-DevStride-Api-Secret": "es",
+                                                                    "X-DevStride-Organization-Id": "eo"}}
+config = os.path.join(work, "full.json")
+fd = os.open(config, os.O_WRONLY | os.O_CREAT, 0o600); os.write(fd, json.dumps({"mcpServers": {"devstride": entry}}).encode()); os.close(fd)
+assert c.credentials(env, config, [], reporter=True)["source"] == "connection-user", "the connection's full key wins"
+os.chmod(stored, 0o640)
+assert c.readiness(env, none, [], reporter=True) == "unsafe-config"
+assert c.unsafe_reason(env, none, [], reporter=True).kind == "reporter"
+os.chmod(stored, 0o600)
+link = os.path.join(work, "config-link"); real = os.path.join(work, "config-real")
+os.makedirs(os.path.join(real, "devstride-plugin"), mode=0o700); shutil.copy(stored, os.path.join(real, "devstride-plugin", "x.json"))
+os.symlink(os.path.join(real, "devstride-plugin", "x.json"), os.path.join(real, "devstride-plugin", "session-reporter.json"))
+assert c.readiness({"XDG_CONFIG_HOME": real}, none, [], reporter=True) == "unsafe-config", "a link is refused"
+clearance = open(os.path.join(sys.argv[1], "skills/release/scripts/clearance_core.py")).read()
+assert "reporter=True" not in clearance and "reporter_credential" not in clearance, "release clearance never reads it"
+PY
+then ok "(11b) the credential is the reporter's last source only, sending the stored secret (never its fingerprint) and the registered organization id: a full key from the environment or the connection wins, other callers never see it, a file open to others or a link is unsafe-config, and release clearance never reads it"
+else bad "(11b) the fourth source"; fi
+REP_DS="$(server reporter)"; : > "$REP_DS/any-key"; REP_URL="http://127.0.0.1:$(cat "$REP_DS/port")"
+OUT="$(DEVSTRIDE_PLUGIN_TEST_URL="$REP_URL" python3 "$RP" check 2>&1)"; printf '%s\n' "$OUT" >> "$ALL"
+CHECK1="$(printf '%s\n' "$OUT" | head -1)"
+run identity; IDENT_REP="$OUT"
+IDENT_FULL="$(DEVSTRIDE_PLUGIN_TEST_URL="$URL" DEVSTRIDE_API_KEY="$KEY" DEVSTRIDE_API_SECRET="$SECRET" DEVSTRIDE_ORG_ID="$ORG" python3 "$RP" identity 2>&1)"
+printf '%s\n' "$IDENT_FULL" >> "$ALL"
+OUT="$(env DEVSTRIDE_PLUGIN_TEST_URL="http://127.0.0.1:$(cat "$REP_DS/port")" PRESENCE_EVENT=start PRESENCE_SESSION_ID=s-rep PRESENCE_STATE=starting PRESENCE_MACHINE=m9 python3 "$RP" 2>&1)"; RC=$?
+if [ "$CHECK1" = "AGENT CONNECTION: READY (session reporter, registered for jane)" ] && [ "$IDENT_REP" = "KEY USER: jane" ] \
+   && [ "$IDENT_FULL" = "KEY USER: keyholder" ] && [ "$RC" = 0 ] && [ -s "$REP_DS/presence.jsonl" ]; then
+  ok "(11c) check names the session reporter and its member; identity names the key's member (stored for a reporter, one whoami for a full key); a report goes with the reporter credential"
+else bad "(11c) check=$CHECK1 identity=$IDENT_REP full=$IDENT_FULL rc=$RC"; fi
+
+# (11d) a reporter credential DevStride no longer knows (revoked, or replaced by another registration) is
+#       set aside, whether the refusal is an HTTP 401 or the hosted address's tool error, so the machine
+#       reads as keyless and registers again, the hosted address's bare gateway refusal included; a 403,
+#       a refusal that names its reason or an outage keeps it; check sends nothing
+REPORTER_FILE="$CONF/session-reporter.json"; SAVED="$WORK/reporter-saved.json"; cp -p "$REPORTER_FILE" "$SAVED"
+restore() { rm -f "$REPORTER_FILE.refused"; cp -p "$SAVED" "$REPORTER_FILE"; }
+send_rep() { OUT="$(env DEVSTRIDE_PLUGIN_TEST_URL="$REP_URL" PRESENCE_EVENT=beat PRESENCE_SESSION_ID=s-rep PRESENCE_STATE=working PRESENCE_MACHINE=m9 python3 "$RP" 2>&1)"; RC=$?; }
+printf 'http403' > "$REP_DS/mode"; send_rep; K403="$RC:$([ -f "$REPORTER_FILE" ] && echo kept)"
+printf 'http500' > "$REP_DS/mode"; send_rep; K500="$RC:$([ -f "$REPORTER_FILE" ] && echo kept)"
+printf 'http401' > "$REP_DS/mode"; send_rep; D401="$RC:$([ -f "$REPORTER_FILE" ] || echo gone):$([ -f "$REPORTER_FILE.refused" ] && echo aside)"
+restore; printf 'tool401' > "$REP_DS/mode"; send_rep; DTOOL="$RC:$([ -f "$REPORTER_FILE" ] || echo gone):$([ -f "$REPORTER_FILE.refused" ] && echo aside)"
+restore; printf 'toolgateway' > "$REP_DS/mode"; send_rep; DGW="$RC:$([ -f "$REPORTER_FILE" ] || echo gone):$([ -f "$REPORTER_FILE.refused" ] && echo aside)"
+restore; printf 'forbidden' > "$REP_DS/mode"; send_rep; KREASON="$RC:$([ -f "$REPORTER_FILE" ] && echo kept)"
+: > "$REP_DS/presence.jsonl"; rm -f "$REP_DS/mode"
+OUT="$(DEVSTRIDE_PLUGIN_TEST_URL="$REP_URL" python3 "$RP" check 2>&1)"; printf '%s\n' "$OUT" >> "$ALL"
+DCHECK="$(printf '%s\n' "$OUT" | head -1)"; DSENT="$([ -s "$REP_DS/presence.jsonl" ] && echo sent || echo none)"
+if [ "$K403" = "3:kept" ] && [ "$K500" = "4:kept" ] && [ "$D401" = "4:gone:aside" ] && [ "$DTOOL" = "4:gone:aside" ] \
+   && [ "$DGW" = "4:gone:aside" ] && [ "$KREASON" = "4:kept" ] && [ "$DSENT" = none ] \
+   && [ "$DCHECK" = "AGENT CONNECTION: READY (session reporter, registered for jane)" ]; then
+  ok "(11d) a reporter credential DevStride no longer knows is set aside (HTTP 401, the tool's 401 error or the gateway's bare refusal) with exit 4, so the hook waits 2 minutes, not 30, for the next skill's registration; a 403, a reasoned refusal or an outage keeps it; check sends nothing"
+else bad "(11d) 403=$K403 500=$K500 401=$D401 tool=$DTOOL gateway=$DGW reasoned=$KREASON check=$DCHECK sent=$DSENT"; fi
+
+# (11e) check on a reporter credential that cannot be read safely: NOT READY with the fix that suits the
+#       reason (chmod 600 only for a file too open, chmod 700 for a folder too open, remove a link), then
+#       the PRESENCE and INTERVAL lines, exit 0
+nokey; noconfig; restore
+chmod 644 "$REPORTER_FILE"; UMODE="$(chk; printf '|rc=%s' "$RC")"; chmod 600 "$REPORTER_FILE"
+chmod 775 "$CONF"; UFOLDER="$(chk; printf '|rc=%s' "$RC")"; chmod 700 "$CONF"
+mv "$REPORTER_FILE" "$WORK/reporter-real.json"; ln -s "$WORK/reporter-real.json" "$REPORTER_FILE"; ULINK="$(chk; printf '|rc=%s' "$RC")"
+rm -f "$REPORTER_FILE"; mv "$WORK/reporter-real.json" "$REPORTER_FILE"
+UNR="AGENT CONNECTION: NOT READY (the session reporter credential cannot be read safely"; OFF="PRESENCE: OFF (no-key)|INTERVAL: none|rc=0"
+if [ "$UMODE" = "$UNR: mode too open)|Fix: chmod 600 $REPORTER_FILE|$OFF" ] \
+   && [ "$UFOLDER" = "$UNR: folder open to others)|Fix: chmod 700 $CONF|$OFF" ] \
+   && [ "$ULINK" = "$UNR: a link)|Fix: remove $REPORTER_FILE; the next DevStride skill run sets up a new one|$OFF" ]; then
+  ok "(11e) check on an unsafe reporter credential: chmod 600 for a file too open, chmod 700 for a folder too open, remove a link (never chmod through it); PRESENCE and INTERVAL follow, exit 0"
+else bad "(11e) mode=$UMODE folder=$UFOLDER link=$ULINK"; fi
+
+# (11f) the folder: prepare closes a folder of the user's own that group or other users have ANY access to
+#       (a 0755 one too) before it writes; a credential in a folder others may write to is never read, one
+#       others may only read is (the file itself is owner-only) (macOS and Linux; Windows has no mode bits)
+if python3 - "$ROOT" "$WORK/rf" <<'PY'
+import os, stat, sys
+sys.path.insert(0, os.path.join(sys.argv[1], "skills/build-item/scripts"))
+import devstride_connection as c, portable, reporter_credential as rc
+work = sys.argv[2]
+env = {"XDG_CONFIG_HOME": work, "DEVSTRIDE_MACHINE_NAME": "m1"}
+conf = rc.folder(env)
+os.makedirs(conf)
+for start in (0o777, 0o755, 0o750, 0o705, 0o711, 0o740):
+    os.chmod(conf, start)
+    rc.prepare(env)
+    got = stat.S_IMODE(os.stat(conf).st_mode)
+    assert got == 0o700, "prepare left a %o folder at %o: it must close it to 0700 before writing" % (start, got)
+rc.finish({"apiKey": "k", "organizationId": "o", "organizationSlug": "s", "username": "u"}, env)
+assert rc.read(env)["apiKey"] == "k"
+for mode in (0o770, 0o707, 0o720):
+    os.chmod(conf, mode)
+    try:
+        rc.read(env); raise AssertionError("read a credential in a folder others may write to: %o" % mode)
+    except c.UnsafeFile as error:
+        assert error.reason == "folder open to others", error.reason
+    assert rc.status(env) == "NONE"
+    assert c.readiness(env, os.path.join(work, "absent.json"), [], reporter=True) == "unsafe-config"
+os.chmod(conf, 0o750)
+assert rc.read(env)["apiKey"] == "k", "a folder others may only read is fine"
+os.chmod(conf, 0o770)  # left group-writable: only the Windows exemption may pass it now
+portable.IS_WINDOWS = True
+assert rc.unsafe_folder(conf) is None, "Windows has no mode bits: its profile's access list guards the folder"
+assert rc.foreign_folder(conf) is None
+PY
+then ok "(11f) prepare closes the user's own folder to 0700 before writing, whatever access group or others had (0755 too); a credential in a folder group or others may write to is refused (status NONE, unsafe-config), one they may only read is not; Windows keeps its access-list rule"
+else bad "(11f) the folder's safety"; fi
+
+# (11g) a folder another user owns, even one that cannot be traversed, or a linked folder, is named BEFORE
+#       the credential is looked up: never read as no key (which would send the next skill into a
+#       registration that cannot be saved); check names the folder reason and removes the folder or the link
+if python3 - "$ROOT" "$WORK/rg" <<'PY'
+import contextlib, importlib.util, io, os, shutil, sys
+root, work = sys.argv[1], sys.argv[2]
+sys.path.insert(0, os.path.join(root, "skills/build-item/scripts"))
+import devstride_connection as c, portable, reporter_credential as rc
+spec = importlib.util.spec_from_file_location("presence_report", os.path.join(root, "hooks", "presence-report.py"))
+report = importlib.util.module_from_spec(spec); spec.loader.exec_module(report)
+env = dict(os.environ, XDG_CONFIG_HOME=work, DEVSTRIDE_MACHINE_NAME="m1")
+for name in ("DEVSTRIDE_API_KEY", "DEVSTRIDE_API_SECRET", "DEVSTRIDE_ORG_ID"):
+    env.pop(name, None)
+conf = rc.folder(env)
+rc.prepare(env)
+rc.finish({"apiKey": "k", "organizationId": "o", "organizationSlug": "s", "username": "u"}, env)
+absent = os.path.join(work, "absent.json")
+def check_lines():
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        report.check(env)
+    return out.getvalue().splitlines()
+real_uid = portable.uid
+portable.uid = lambda: real_uid() + 1  # the folder (and the file in it) now belong to someone else
+os.chmod(conf, 0o000)  # and it cannot be traversed: the file cannot even be looked up
+try:
+    try:
+        rc.read(env); raise AssertionError("a folder another user owns read as no credential")
+    except c.UnsafeFile as error:
+        assert error.reason == "folder not yours", error.reason
+    assert rc.status(env) == "NONE"
+    assert c.readiness(env, absent, [], reporter=True) == "unsafe-config", "never no-key: that would ask for a registration"
+    lines = check_lines()
+    assert lines[0] == "AGENT CONNECTION: NOT READY (the session reporter credential cannot be read safely: folder not yours)", lines
+    assert lines[1] == "Fix: remove %s; the next DevStride skill run sets up a new one" % conf, lines
+finally:
+    os.chmod(conf, 0o700); portable.uid = real_uid
+assert rc.read(env)["apiKey"] == "k"
+real = os.path.join(work, "real-folder"); shutil.move(conf, real); os.symlink(real, conf)
+try:
+    rc.read(env); raise AssertionError("a credential read through a linked folder")
+except c.UnsafeFile as error:
+    assert error.reason == "folder is a link", error.reason
+os.unlink(os.path.join(real, rc.FILE_NAME))
+try:
+    rc.read(env); raise AssertionError("a linked folder with no credential read as no key")
+except c.UnsafeFile as error:
+    assert error.reason == "folder is a link", error.reason
+lines = check_lines()
+assert lines[1] == "Fix: remove %s; the next DevStride skill run sets up a new one" % conf, "remove the link, never the file through it: %r" % lines
+portable.IS_WINDOWS = True
+assert rc.foreign_folder(conf) is None, "Windows keeps its access-list rule"
+PY
+then ok "(11g) a folder another user owns (even one that cannot be traversed) or a linked folder is refused before the credential is looked up, never read as no key; check names the reason and removes the folder or the link itself"
+else bad "(11g) a foreign or linked folder"; fi
+rm -rf "$CONF"
 
 # (9) across every captured output, and everything the reporter left on disk: no key, secret or organization id
 if ! grep -rqF -e "$KEY" -e "$SECRET" -e "$ORG" "$ALL" "$XDG_CACHE_HOME" 2>/dev/null \

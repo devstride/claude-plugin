@@ -7,7 +7,7 @@ description: "Create a feature branch off the working base, named by the reposit
 
 Read `${CLAUDE_PLUGIN_ROOT}/skills/release/references/step-skills.md` first: the rule every step skill follows.
 
-**Goal:** a correctly named feature branch, cut from a freshly pulled working base and pushed with
+**Goal:** a correctly named feature branch, cut from a freshly fetched working base and pushed with
 its upstream set. Arguments: $ARGUMENTS — the branch name, then optionally `base: <branch>`, the
 working base to cut it from (the Build workflow passes `I<number>-<slug> base: <working base>`).
 No name → ask for one, standalone only.
@@ -25,8 +25,11 @@ No name → ask for one, standalone only.
   step, passing the working base explicitly, as `build-item` derived it (the story's epic integration branch; for
   a one-off the release train when `releaseTrain.branch` is set, else `baseBranch`); (2) config
   `integrationBranch` when non-null; (3) `baseBranch`. An integration branch must already exist on
-  the remote (`build-item` step 0 creates the epic branch); if checking it out fails, answer
-  `REFUSED` and tell the caller to create it off `baseBranch` — never fall back to develop silently.
+  the remote (`build-item` step 0 creates the epic branch); `origin/<working base>` missing after
+  the fetch → `REFUSED`, telling the caller to create it off `baseBranch` — never fall back to
+  develop silently.
+- **Never check out the working base by name** (another worktree may hold it): cut from
+  `origin/<working base>`.
 - **Stay in the checkout you hold.** Branch inside the current checkout (under `build-item`'s
   checkout-pool lease when the repo declares a pool); this skill never creates a worktree or
   instance.
@@ -38,7 +41,13 @@ No name → ask for one, standalone only.
   ambiguous → `REFUSED`, asking for the prefix.
 - **Safe to re-run.** A branch of that name already on origin or local, any date
   (`<user-prefix>/*/<branch-name>`: a resumed story, or one moved to another base) → check it out,
-  `git pull --ff-only`, and answer `EXISTS`; never cut a second one. A pull that cannot
+  then ask origin for exactly that branch every time, even when its upstream settings already name
+  it (git keeps them after the remote branch is deleted), and point the upstream at it (never the
+  shared base): `if git ls-remote --exit-code origin refs/heads/<branch> >/dev/null; then git
+  config branch.<branch>.remote origin && git config branch.<branch>.merge refs/heads/<branch>;
+  else git push -u origin <branch>; fi` (the full ref: a bare name also matches
+  `archive/<branch>`; a failure → `REFUSED`); then `git pull --ff-only`, and answer
+  `EXISTS`; never cut a second one. A pull that cannot
   fast-forward (a local branch rewritten and never pushed) → `REFUSED`, naming both heads; never
   merge or reset to get past it.
 - **Never delete the previous branch automatically** — keep it until its PR merges. Only on an
@@ -51,8 +60,9 @@ No name → ask for one, standalone only.
 
 1. Check the tree is clean; note the current branch (`git rev-parse --abbrev-ref HEAD`); look for
    an existing branch of this name.
-2. `git checkout <working base>` then `git pull`.
-3. `git checkout -b <new-branch>` then `git push -u origin <new-branch>`.
+2. `git fetch origin`.
+3. `git checkout --no-track -b <new-branch> origin/<working base>` (never the shared base as its
+   upstream) then `git push -u origin <new-branch>`.
 4. Confirm it was created and pushed; report the full branch name.
 
 ## Result

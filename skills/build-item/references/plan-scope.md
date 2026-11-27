@@ -45,14 +45,22 @@ unit in plan scope").
   (the plan branch once it exists, else `baseBranch`) instead of `baseBranch`.
 - An EXISTING epic branch in plan scope is refreshed when a story starts: if
   `git merge-base --is-ancestor origin/<plan branch> origin/<epic branch>` fails, merge the plan
-  branch in (`--no-ff`) and push before branching; a conflict STOPS.
+  branch in and push before branching, never checking the epic branch out by name: `git checkout
+  --detach origin/<epic branch> && git merge --no-ff origin/<plan branch>`, then `git push origin
+  HEAD:refs/heads/<epic branch>`; refused → `git fetch origin`: the epic branch moved → test
+  again, otherwise STOP naming the refusal's first line. A conflict STOPS.
 
 ## An epic's release (step 8)
 
 The gate is unchanged. Then, in `epic-release-steps.md`'s order, with these differences:
 
-- **Refresh** the plan branch first: merge `origin/<from>` into it (`--no-ff`), push. Then merge the
-  plan branch into the epic branch in place of `baseBranch`. A conflict STOPS; a migration number
+- **Refresh** the plan branch first, detached as at a story's start: `git checkout --detach
+  origin/<plan branch> && git merge --no-ff origin/<from>`, then `git push origin
+  HEAD:refs/heads/<plan branch>`; refused → `git fetch origin`: the plan branch moved → refresh
+  again, otherwise STOP naming the refusal's first line. Then, on the epic branch the releasing
+  session (the `epic-release` claim holder when claims are in use) checked out by name as
+  `epic-release-steps.md`'s Refresh says, merge `origin/<plan branch>` in place of
+  `baseBranch`. A conflict STOPS; a migration number
   taken on both sides STOPS for the owner.
 - **Cut** the EPIC RELEASE PR with base = the plan branch; review the full diff as today.
 - **Close out** — step 8's, a recovery's and the run after an owner merged it (autoRelease off) —

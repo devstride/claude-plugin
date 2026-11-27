@@ -53,8 +53,9 @@ An item outside a sequenced plan is auto-detected as a one-off: $ARGUMENTS
   hand-back come from the repo, never hard-coded (`ground-truth-at-start.md`). Never create a
   worktree or instance unless the owner asks in this conversation; never delete another session's
   lease.
-- **Serial by design.** "Parallel waves" are SHAPE (`references/next-unblocked.md`):
-  `localEnvironment` never makes the loop concurrent.
+- **Parallel by claim.** Agents share a plan only through claims, up to DevStride's stored limit;
+  every terminal exit releases the plan slot (`references/parallel-building.md`);
+  `localEnvironment` never makes one loop concurrent.
 - **Full-auto through merge.** PAUSE only at a genuine fork: a user's human/infra decision, an
   ambiguous or unverifiable finding, a destructive or outward-facing action. Record every deferral;
   never skip silently.
@@ -95,8 +96,7 @@ release/settle belong to `review` step 7). Around them: step 0's row, the `Profi
 source, a row per configured engine (an unconfigured one: "not configured"), each matched
 `mandatory lens <name>: ran (N findings)`, step 8 `n/a` on a one-off. **EVIDENCE, not intent**:
 "request registered in timeline", never "requested"; "non-applicable" with its reason, never a bare
-"skipped"; a missing CI check says `skipping` or never ran, and why. The fast path shows the
-deferred cloud rows visible. A render, not a gate. **Read
+"skipped"; a missing CI check says `skipping` or never ran, and why. A render, not a gate. **Read
 `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/progress-table.md` at the first render in a
 session or after a compaction.**
 
@@ -113,8 +113,8 @@ Read "the working base" wherever a step says develop; re-derive it per RELEASE U
    backs every `hierarchyRoles.leaf` read here. A CONFIGURED `releaseUnit` no ancestor matches is
    checked with `get_work_type_hierarchy` — a renamed type or typo STOPS with a question. Name
    per `epicIntegrationBranches.pattern` / `slugRule`, dated at CREATION, never re-minted. Resolve:
-   handoff memory → `git ls-remote --heads origin` → the helper below (`create` → off a fresh
-   `baseBranch`, pushed). Cache per epic; **announce reused or created.**
+   handoff memory → `git ls-remote --heads origin` → the helper below (`create` → pushed from
+   `origin/<baseBranch>`, never checked out; refused → resolve again and adopt, `parallel-building.md`). Cache per epic; **announce reused or created.**
 3. **A one-off AND `releaseTrain.branch` set** → the train, unless `release-train.md` routes it to
    `baseBranch` (announced); a train missing beside one other `train/*` branch rides that one.
 4. **Otherwise** → `baseBranch`. A disabled flag falls back.
@@ -168,6 +168,9 @@ ask. **The same workflow runs, with `oneOff` true.** Deltas:
   above a unit decides, any case: `plan` → read
   `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/plan-scope.md` now; `epic` or none → default;
   another value → STOP.
+- **Plan slot** (plan mode), before selection: take it per
+  `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/parallel-building.md`; full → its
+  message, `return-checkout`, end.
 - **Active Agents** (`activeAgents` set, plan mode only): at EVERY pickup, after each merge and at
   every terminal exit (step 0's, step 7's, a STOP — before it exits), apply
   `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/active-agents.md`. Never asks; fails open.
@@ -187,11 +190,11 @@ ask. **The same workflow runs, with `oneOff` true.** Deltas:
   person what finished it and that it was never checked or reviewed here, then the next rule.
 - A given story number IS the story; merged or Done → never started, no run (`next-unblocked.md`).
   Otherwise apply `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/next-unblocked.md` in full
-  (projection warning too). **Never auto-select from the deferred container.** Surface the
+  (projection warning too), minus other agents' claims (`parallel-building.md`). **Never auto-select from the deferred container.** Surface the
   whole ready-set.
 - **DRY-CHAIN / TERMINAL:** no selectable candidate → exit cleanly, never re-ask, saying which:
   plan complete (then **Closing**, `deferred-container.md`) / N landed, awaiting their release (gate on →
-  step 8 for it, then step 0; its rollup report: `next-unblocked.md`) / N blocked by X, Y / N gated.
+  step 8 for it, then step 0; its rollup report: `next-unblocked.md`) / N blocked by X, Y / N gated / nothing free.
   Suggest `/devstride:plan <root>` only when the chain ran out; never invoke it.
 - **Every exit from step 0** (DRY-CHAIN/TERMINAL, ambiguous root, a given item merged or Done, any
   other stop before the run starts) → **`return-checkout`** first when this run leased, and a claim
@@ -201,8 +204,9 @@ ask. **The same workflow runs, with `oneOff` true.** Deltas:
   (buildable now vs deferred, recorded), **VALIDATE THE SPEC** (re-fetch with `view: 'full'`; confirm
   paths, symbols and assumptions against the code).
 - Resolve the profile; report item, title, ready-set, profile with source, buildable-now line.
-- The claim runs as the workflow's first step (`claim-story`, mode `select`, `named` or `resume`;
-  `references/story-claims.md`).
+- **Claim before the runner**: `claims` set → claim a selected story (`claim-story`, mode `select`)
+  as (1) a named one: `HELD` → next candidate, lease kept, no `resume` or `start`; else The
+  run (its claim step renews it; `references/story-claims.md`).
 
 ## The run
 
@@ -216,18 +220,11 @@ command, and again after a compaction**: the commands, the answers, the stops an
    (`name`, `source`), `workingBase`, `oneOff`, `route`, `releaseUnit` (step 0's release-unit
    ancestor; null for a one-off), `reviewMoment` (Working base), `branchSlug`
    (`I<number>-` plus `routing.py slug` of the title), `mode` (`select`, `named` or `resume`), `trigger` `item-picked-up`.
-2. **`resume` with the item first** (a named or handed-off story after step 0's claim check; a
-   selected one straight away): it finds this session's open
+2. **`resume` with the item first** (after step 0's claim check): it finds this session's open
    run, or adopts the newest unfinished one another session left for the item in this repository,
    re-bound here (`adoptedFrom` names where it came from: say it), and hands back its current step. Any command refused `wrong-branch` (a `resume`,
-   `next` or `done` of an adopted run off its story branch, named) → `git fetch origin
-   "+refs/heads/<branch>:refs/remotes/origin/<branch>"` (for a branch only here it fails,
-   harmlessly); then `git checkout <branch>` when it exists here, else `git checkout -b
-   <branch> origin/<branch> && git config branch.<branch>.remote origin && git config
-   branch.<branch>.merge refs/heads/<branch>` (so a bare `git push` works where the clone's
-   fetch rule misses the branch); `git rev-parse --abbrev-ref HEAD` printing it; then the same request again. The branch held by another worktree (`git worktree list`), or absent
-   here and on the remote → STOP, naming what a person must do: free it there, or push it from the
-   checkout that has it.
+   `next` or `done` of an adopted run off its story branch, named) → check it out as
+   run-workflow's `workflow-runner.md` says (or STOP), then the same request again.
    Refused `no-run` or `run-other-repository` → **`start`** with `definitionFile`
    `${CLAUDE_PLUGIN_ROOT}/workflows/build.json`, that context and `fetched` (run-workflow's `references/fetching-the-workflow.md`).
    A `start` refused `run-open` means a run exists: `resume` it; only the excluded-paths re-route
@@ -267,12 +264,10 @@ command, and again after a compaction**: the commands, the answers, the stops an
 
 ## 7. Sync and proceed
 
-- After a completed run, its last step (`sync-base`) left the checkout on the working base with a
-  clean tree. **Terminal exit or hand-over only: `return-checkout`, after its own check**: `git
-  checkout <working base> && git pull --ff-only`, then `git status --porcelain` empty — dirty →
-  name the drift and STOP, lease kept, nothing reset or staged. Repeated here: a
-  terminal exit may follow a run that never synced (a release hold).
-- **Handoff memory**: what shipped, what remains, the plan root WITH profile and source (never the
+- **Terminal exit or hand-over only: `return-checkout`, after its own check**: `git
+  fetch origin && git checkout --detach origin/<working base>`, then `git status --porcelain` empty — dirty →
+  name the drift and STOP, lease kept, nothing reset or staged.
+- **Handoff memory**, one in-progress line per session: what shipped, what remains, the plan root WITH profile and source (never the
   profile alone), the epic's integration branch keyed to its number (or "develop — no epic").
 - **Counts**: `hierarchyRoles.leaf` descendants neither Done nor landed, of **the SAME
   release-unit ancestor step 0 resolved** — never the direct parent (why:
@@ -295,13 +290,14 @@ unit, an ancestor or a leaf it carries (`references/release-holds.md`; held → 
 `epicIntegrationBranches.autoRelease` when PRESENT, the profile default only when ABSENT. Off →
 cut nothing; report release-ready and stop — after the owner merges it, one
 `/devstride:build-item <root>` run marks its stories Done (plan scope: landed, `plan-scope.md`). **`"ask"` is a third legal value**: ask
-the owner once per unit, cutting nothing until answered; unanswerable → `false`, SAYING so. **Read
+the owner once per unit, cutting nothing meanwhile; unanswerable → `false`, said. **Claim first**, from step 7 or step 0 (dry chain, recovery), unless auto-release is off: the
+`epic-release` claim (`parallel-building.md`), before any question; held → say who, carry on (dry chain: exit). **Read
 `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/epic-release.md` when step 7 reports the release
 unit at zero and before cutting the release PR.**
 
 The release target is `routing.py release-target`'s `branch` (`ask` → ask the owner which is live, set `releaseTrain.branch` or cut over, run it again; plan scope: `plan-scope.md`).
 
 **Read `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/epic-release-steps.md` in full before
-acting on a release that fires, or on step 0's recovery close-out** — refresh, verification, the release PR cut, review,
+acting on a release that fires, or on step 0's recovery close-out** — refresh (the releasing session's one checkout of the epic branch by name), verification, the release PR cut, review,
 merge, close-out, docs and recap live there. New
 findings → invoke `capture-findings` with the release unit.

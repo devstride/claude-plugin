@@ -48,7 +48,7 @@ STOPS and asks, and never retries with another name.
   and the lease is KEPT across loop iterations: a story that ends in "then step 0" never hands
   the checkout back.
 - **`return-checkout` only after the last checkout operation** — for a run that built something,
-  after a checkout, pull and clean-tree check (the run's sync step, or step 7's own), never before it — and only at a terminal exit (a one-off's TERMINATE, step
+  after a fetch, a detached checkout of the working base and a clean-tree check (the run's sync step, or step 7's own, since a hold can end the run before its sync), never before it — and only at a terminal exit (a one-off's TERMINATE, step
   8's release-ready stop, a named or resumed story or a one-off ending held: a claim held by
   another agent, or a release hold) or a hand-over to another session or the owner. A STOP during the run or in step 7 that
   leaves the work for this session to resume keeps the lease (`run-stops.md`).

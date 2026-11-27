@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v4.13.0/schemas/ds-config.schema.json",
+  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v4.14.0/schemas/ds-config.schema.json",
   "title": "DevStride delivery-loop repository config (.claude/ds-config.json)",
   "type": "object",
   "properties": {
@@ -1525,7 +1525,7 @@
         "^_": {}
       },
       "additionalProperties": false,
-      "description": "how every session reports its live status (session start, prompts, tool uses and finished turns, throttled; a keeper every intervalMinutes; session end). Absent, empty or without a command: the built-in reporter sends each report to DevStride with the API key the machine's DevStride connection carries (nothing runs where that connection has no key). With a command: the repository's own command runs instead and decides what a report means. null: off for this repository, the built-in reporter and any command alike; a blank command also runs nothing. DEVSTRIDE_PRESENCE=0 in the environment switches a whole machine off"
+      "description": "how every session reports its live status (session start, prompts, tool uses and finished turns, throttled; a keeper every intervalMinutes; session end). Absent, empty or without a command: the built-in reporter sends each report to DevStride with the API key the machine's DevStride connection carries (else the session reporter credential a browser sign-in sets up; nothing runs with neither). With a command: the repository's own command runs instead and decides what a report means. null: off for this repository, the built-in reporter and any command alike; a blank command also runs nothing. DEVSTRIDE_PRESENCE=0 in the environment switches a whole machine off"
     },
     "releaseTrain": {
       "type": [

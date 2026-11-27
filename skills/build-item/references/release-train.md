@@ -21,8 +21,9 @@ with the train as the pull request's base.
   nothing ever merges the train into `baseBranch`, so route the one-off to `baseBranch` instead and
   announce why ("release train set, but releases do not merge it").
 - **One-off AND `releaseTrain.branch` set (and the train ships) → the working base is the train.**
-  Resolve it with `git ls-remote --heads origin`: present → reuse; absent → create it off a freshly
-  fetched `origin/<baseBranch>` and push. Announce "release train <name>: reused" or "created".
+  Resolve it with `git ls-remote --heads origin`: present → reuse; absent → create it from a freshly
+  fetched `origin/<baseBranch>` without checking it out (`git push origin
+  origin/<baseBranch>:refs/heads/<train>`). Announce "release train <name>: reused" or "created".
 - **A renamed train is never created beside the old one.** Configured train absent and exactly one
   other `train/*` branch on origin → that branch IS the train until the rename is cut over: the
   one-off rides it (nothing created), and the announcement names the cutover and its commands, as

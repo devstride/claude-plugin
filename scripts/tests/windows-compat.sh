@@ -18,4 +18,17 @@ found=$(grep -nE '^import fcntl|^from fcntl|shell=True|strftime\([^)]*%-' hooks/
 if [ -z "$found" ]; then ok "(2) no top-level fcntl import, shell=True or %- date format outside portable.py"; else bad "(2) $found"; fi
 out=$(cd "$(mktemp -d)" && OSTYPE=msys PATH=/usr/bin:/bin HOME="$PWD" bash -uc '. "$1/hooks/python.sh"; echo "$?:${DEVSTRIDE_PY:+set}"' _ "$ROOT" 2>&1)
 case "$out" in 0:set) ok "(3) the launcher finds Python on a Windows-style shell with no cache, under set -u" ;; *) bad "(3) $out" ;; esac
+out=$(python3 - "$ROOT" <<'PY' 2>&1
+import os, sys
+sys.path.insert(0, os.path.join(sys.argv[1], "skills", "build-item", "scripts"))
+import portable, reporter_credential as rc
+portable.IS_WINDOWS = True
+assert rc.folder({"APPDATA": "/appdata", "XDG_CONFIG_HOME": "/xdg"}) == os.path.join("/appdata", "devstride-plugin")
+portable.IS_WINDOWS = False
+assert rc.folder({"APPDATA": "/appdata", "XDG_CONFIG_HOME": "/xdg"}) == os.path.join("/xdg", "devstride-plugin")
+assert rc.folder({"HOME": os.path.expanduser("~")}) == os.path.join(os.path.expanduser("~"), ".config", "devstride-plugin")
+PY
+)
+if [ -z "$out" ]; then ok "(4) the session reporter credential lives under %APPDATA% on Windows, else \$XDG_CONFIG_HOME or ~/.config"
+else bad "(4) $out"; fi
 exit "$FAIL"

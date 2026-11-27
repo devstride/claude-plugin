@@ -1,8 +1,9 @@
 # DevStride for Claude Code
 
 DevStride's agentic delivery loop, packaged as a Claude Code plugin. Plan a roadmap into
-existence, then let the loop walk it one story at a time — branch, build, adversarially review,
-merge, and release — against your own repository and your own DevStride organization.
+existence, then let the loop walk it story by story — branch, build, adversarially review,
+merge, and release — against your own repository and your own DevStride organization, with as
+many agents on one plan at once as your organization's stored limit allows.
 
 > **Status: early.** The delivery-loop skills and the DevStride MCP connection are both
 > bundled — installing the plugin is all the *configuration* the connection needs, though you still
@@ -152,14 +153,14 @@ what makes a machine **ready for agents**.
    ```
 
 3. Restart Claude Code. `/devstride:setup connect` checks the result and, on your yes, proves it
-   with one throwaway report; `/devstride:doctor` reports a machine without a key as not ready for
-   agents.
+   with one throwaway report; `/devstride:doctor` warns about a machine without a key.
 
 Only those three headers are required. `X-DevStride-Organization-Slug` is optional — supplying it
 just saves the server one round trip resolving the slug on startup. The command stores the key in
 Claude Code's own user configuration, the single place the skills' tools and the plugin's session
-reporter both read it from. Installing the plugin never asks for a credential and never stores
-one: the plugin writes no key anywhere, and nothing it runs prints one.
+reporter both read it from. Installing the plugin never asks for a credential, and nothing it runs
+prints one; the only key it ever stores is the narrow session reporter a browser sign-in sets up
+(see [Live status on the Fleet](#live-status-on-the-fleet)).
 
 **Do this before running any skill.** Until a connection is live the server contributes *no tools
 at all* — DevStride rejects unauthenticated requests, including the tool listing — and nothing
@@ -186,7 +187,7 @@ or secret into a file you commit.
 move to another, `claude mcp remove devstride` and add it again with that organization's key.
 
 <details>
-<summary>Trying the skills with a browser sign-in (not ready for agents)</summary>
+<summary>Using the skills with a browser sign-in</summary>
 
 To try the skills by hand before creating a key, sign in to the bundled server instead:
 
@@ -198,9 +199,11 @@ Connect the server listed as **`plugin:devstride:devstride`**. That opens your b
 to DevStride and pick an organization, and the skills have their tools. Read the consent screen
 before accepting: it grants the same read and write access.
 
-A connection that only signs in through the browser carries no API key, so that machine is **not
-ready for agents**: its sessions are not shown on the Fleet, and nothing a script runs outside the
-model can reach DevStride. The plugin says so once, at a session start, and never works around it.
+A connection that only signs in through the browser carries no API key. Each session start says
+the session is not on the Fleet yet, and the first DevStride skill you run sets up a narrow
+reporting key for the machine so its sessions show there (see
+[Live status on the Fleet](#live-status-on-the-fleet)). Nothing else a script runs outside the model
+reaches DevStride; for that, connect a key as above.
 To switch organization on this path, run `claude mcp logout plugin:devstride:devstride` and
 connect again.
 
@@ -248,7 +251,12 @@ the session runs a DevStride skill.
 - **Turning it off.** `"presence": null` in a repository's `.claude/ds-config.json` switches that
   repository off; `DEVSTRIDE_PRESENCE=0` in the environment switches a whole machine off.
 - **It never gets in the way.** With an older DevStride or no network it stays silent and never
-  slows a turn; with no key it reports nothing and says so once, at one session start. A repository that names its own `presence.command` keeps using that instead.
+  slows a turn. A repository that names its own `presence.command` keeps using that instead.
+- **Signed in through the browser?** Such a connection carries no key, so each session start says
+  the session is not on the Fleet yet. The first time you run a DevStride skill, the plugin sets up
+  a narrow reporting key for the machine by itself (it can only report your own sessions) and says
+  so in one line; revoke it any time under **Profile Settings → API Keys**, which also shows when it
+  last reported. A full key, connected as above, always takes its place.
 
 The contract is `skills/setup/references/session-presence.md`.
 
@@ -708,7 +716,7 @@ jq -n --slurpfile c .claude/ds-config.json '{config: $c[0], heads: ["develop"], 
 under a committed token budget, with rationale moved to per-skill references loaded only at
 the step that needs them; the full before/after table is in the CHANGELOG.
 
-Current version: **4.13.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **4.14.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 The public repository, `devstride/claude-plugin`, is a published copy written only by the release

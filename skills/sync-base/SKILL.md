@@ -16,12 +16,13 @@ Arguments: $ARGUMENTS — one JSON object, the `sync@1` payload
 
 ## Steps
 
-1. `git checkout <workingBase> && git pull --ff-only`.
+1. `git fetch origin && git checkout --detach origin/<workingBase>`: the working base, DETACHED at
+   its fresh remote tip. Never `git checkout <workingBase>`: another worktree may hold it.
 2. **assert a clean tree** with `git status --porcelain`: empty → `CLEAN`.
 3. Anything listed → `DIRTY` naming the drift (each path, or the count and the first few): never
    auto-reset or `git add .`, never stash, never delete a file to make it pass. A person decides
    what the drift is.
-4. A checkout or pull that fails (a diverged base, a missing branch) → `DIRTY`, naming the git
+4. A fetch or checkout that fails (a missing branch, changes in the way) → `DIRTY`, naming the git
    error: the run stops there.
 
 Handing the checkout back (`return-checkout`) is the loop's, after this step, and only at a
@@ -29,8 +30,8 @@ terminal exit.
 
 ## Result
 
-After the verdict and its evidence, one fenced `json` block: `branch` (the branch now checked out)
-and `clean`.
+After the verdict and its evidence, one fenced `json` block: `branch` (the working base,
+now checked out detached at `origin/<workingBase>`) and `clean`.
 
 **Step rules.** This step only; verdict first; safe to re-run; config wins; it never starts a
 subagent and never decides what runs next.

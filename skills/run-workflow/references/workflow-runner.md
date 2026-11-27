@@ -251,7 +251,14 @@ would overwrite this session's own open run for that item (no item: of that work
 run goes on only on its story branch** (the branch step's `branch`) until its merge has finished:
 while the checkout is on any other branch, or none, every command that would hand out a step is
 refused (`wrong-branch`, naming the branch; nothing changes, the adoption included), so check the
-branch out and send the same request again. Stops are still answered, and a merge handed back as it
+branch out and send the same request again: `git fetch origin
+"+refs/heads/<branch>:refs/remotes/origin/<branch>"` (for a branch only here it fails,
+harmlessly); then `git checkout <branch>` when it exists here, else `git checkout -b
+<branch> origin/<branch> && git config branch.<branch>.remote origin && git config
+branch.<branch>.merge refs/heads/<branch>` (so a bare `git push` works where the clone's
+fetch rule misses the branch); `git rev-parse --abbrev-ref HEAD` printing it. The branch held by
+another worktree (`git worktree list`), or absent here and on the remote → STOP, naming what a
+person must do: free it there, or push it from the checkout that has it. Stops are still answered, and a merge handed back as it
 was issued is exempt: it may have landed and deleted the branch, and its landing is checked first.
 The runner cannot tell a live session's run from a dead one's: the driver checks the story's claim first. Two
 sessions driving one run at once are not supported.

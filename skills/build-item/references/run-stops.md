@@ -27,7 +27,8 @@ which its The run section handles itself. Read in full before acting on any othe
   landed without this run's checks and review; then step 0 of `SKILL.md`, where the merged item is
   never started again. Unsure → the stop stays. Nothing landed → put the checkout back on the story branch, then `resume` with
   `"landed": false`: at once for a push refused in a race (the merge step tries again), otherwise
-  once its cause is fixed. Step 0 of `SKILL.md` applies the same three answers to a run it resumes
+  once its cause is fixed. A push refused because another story landed first is not a stop: the
+  merge answers `MERGE: REFRESHED` and the runner re-earns the local checks (`merge-paths.md`). Step 0 of `SKILL.md` applies the same three answers to a run it resumes
   while its merge row is `issued` or stopped; a merge row `done` with `MERGE: LANDED` is carried
   on, never checked again (`MERGE: REFRESHED` is not a landing).
 - **A merge `BLOCKED` on excluded paths** (a train one-off carrying deploy configuration or a

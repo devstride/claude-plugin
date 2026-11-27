@@ -13,13 +13,18 @@ when the connection is not ready).
 
 - **`AGENT CONNECTION: READY (…)`** → PASS, naming where the key was found by those fixed words
   only (the environment; the devstride connection, this project; the devstride connection, user
-  level).
-- **`AGENT CONNECTION: NOT READY (no API key: …)`** → FAIL: "not ready for agents: this machine's
-  DevStride connection carries no API key (browser sign-in only)". The skills still run under a
-  browser sign-in, but the built-in reporter shows no session on the fleet view, and a script
-  reaches DevStride only where something else supplies a key (a repository's own presence
-  command, `release.clearance.credentialsFile`). Fix: `/devstride:setup connect`. A member whose role cannot create an API key asks an
-  administrator for that permission; nothing else gives the machine a key.
+  level; the session reporter, registered for a member).
+- **Whose key it is.** With a key, run `python3 "${CLAUDE_PLUGIN_ROOT}/hooks/presence-report.py"
+  identity` (`KEY USER: <username>`) and call `whoami` over your own DevStride connection. Different
+  members → FAIL: "this machine reports its sessions as <key user>, but you are signed in as <you>".
+  Fix: replace the key with your own (`/devstride:setup connect`), or delete the reporter credential
+  and revoke its key under Profile Settings, API Keys, so your next skill run sets up your own. `KEY USER: unknown (…)` → WARN, as it reads.
+- **`AGENT CONNECTION: NOT READY (no API key: …)`** → WARN: "this machine's DevStride connection
+  is a browser sign-in with no key, so its sessions are not on the Fleet yet". The next DevStride
+  skill run sets up a session reporter by itself (a narrow key that can only report this member's
+  sessions). For a full key instead: `/devstride:setup connect`.
+- **`AGENT CONNECTION: NOT READY (the session reporter credential cannot be read safely: …)`** →
+  FAIL. Fix: the `Fix:` line `check` printed under it, relayed word for word (it suits the reason).
 - **`AGENT CONNECTION: NOT READY (Claude Code's configuration file cannot be read safely: …)`** →
   FAIL. Fix: `chmod 600` on Claude Code's configuration file (`$CLAUDE_CONFIG_DIR/.claude.json`,
   else `~/.claude.json`) for `mode too open`; a link is replaced by the file itself; `not yours`
@@ -52,6 +57,7 @@ when the connection is not ready).
   once and report its first line. A clear or held answer passes; `UNKNOWN` FAILs naming the cause
   it prints.
 - **Credentials** → present in the environment, in `release.clearance.credentialsFile`, or in the
-  connection's own key (Ready for agents, above). A named file
+  connection's own key (Ready for agents, above; never the session reporter, which the clearance
+  provider does not read). A named file
   must exist and not be readable by group or others (`stat`: mode 600 or stricter); looser → FAIL,
   Fix: `chmod 600 <file>`. Report presence only.

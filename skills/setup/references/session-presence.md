@@ -24,17 +24,18 @@ Decided per session by `skills/build-item/scripts/presence_settings.py`, in this
 3. **Otherwise the built-in reporter**, `hooks/presence-report.py`: no block, an empty block, a
    block with only `intervalMinutes`, a repository with no config file, or a session outside any
    repository. It sends each report to DevStride (the tool `report_session_presence`) with the API
-   key the machine's DevStride connection carries. **With no key nothing runs and no record is
-   written**: the first session start on such a machine says so in one line, once per machine (an
-   empty marker file beside the records remembers it), and nothing else is ever printed.
+   key the machine's DevStride connection carries, else the session reporter credential (The one
+   key). **With neither nothing runs and no record is written**: every session start shows the
+   person one line saying the session is not on the Fleet yet, and a prompt that runs a DevStride
+   skill asks the model to set up the session reporter first. Nothing else is ever printed.
 
 `intervalMinutes` (an integer, 1 to 60) is the keeper's beat: default 5 with a command, 1 for the
 built-in reporter; one out of range reads as that default, and doctor warns.
 
 ## The one key
 
-There is one DevStride credential per agentic machine: the API key its DevStride connection
-carries. The built-in reporter and the DevStride release clearance provider find it in one place,
+An agentic machine reports with one DevStride credential: the API key its DevStride connection
+carries, else its session reporter credential (below). The built-in reporter and the DevStride release clearance provider find it in one place,
 `skills/build-item/scripts/devstride_connection.py`, in one order: the environment
 (`DEVSTRIDE_API_KEY`, `DEVSTRIDE_API_SECRET`, `DEVSTRIDE_ORG_ID`); for the clearance provider only,
 the file `release.clearance.credentialsFile` names; then the server named `devstride` in Claude
@@ -47,11 +48,27 @@ it is a regular file the user (or root) owns, not a link, at most 16 MiB, with n
 permission bits.
 
 The key goes only to an `https://api(-<stage>).devstride.(com|dev)` host, redirects are refused,
-every call is bounded, and no hook prints or logs a key, puts one on a command line or adds one to
-a child's environment. **The plugin creates no key, writes no key anywhere and never asks for one
-in the chat.** A connection that only signs in through the browser carries no key: that machine is
-**not ready for agents**, and nothing works around it (Claude Code's own sign-in token is never
-read). A project `.mcp.json` is not read, nor a `devstride` server kept under another name.
+every call is bounded, and no hook prints or logs a secret, puts one on a command line or adds one
+to a child's environment. The plugin never asks for a key in the chat. A project `.mcp.json` is not
+read, nor a `devstride` server kept under another name, nor Claude Code's own sign-in token.
+
+**The session reporter credential.** A connection that only signs in through the browser carries no
+key. On such a machine, the first prompt that runs a DevStride skill tells the model to run
+`skills/build-item/scripts/reporter_credential.py prepare` (a secret made and kept on the machine;
+only its SHA-256 fingerprint is printed), call `register_session_reporter` over the signed-in
+connection with the machine's name and that fingerprint, run `finish` with the answer, and tell the
+person in one line what was set up and that it is revoked under Profile Settings, API Keys (which
+also shows when it last reported). The session that registers shows on the Fleet at its next tool
+call, not its next prompt. The credential (`session-reporter.json` in
+`$XDG_CONFIG_HOME/devstride-plugin/`, else `~/.config/devstride-plugin/`, or
+`%APPDATA%\devstride-plugin\` on Windows; owner-only, and on macOS and Linux never read from a
+folder others may write to, which `prepare` tightens to 0700) is the built-in reporter's last
+source, after every full key. When DevStride no longer knows it (revoked under Profile Settings, or replaced by
+another registration of the same machine name), the first report DevStride refuses for that reason
+moves it aside to `session-reporter.json.refused`: the machine reads as keyless again, the
+session-start line returns and the next DevStride skill registers a new one. DevStride refuses it on
+every route but the session presence report, so the release clearance provider never reads it and
+the skills keep using the signed-in connection.
 
 ## What the built-in reporter sends
 
@@ -68,8 +85,10 @@ The server answers `recorded`, `ended`, `stale` (an older report than the one st
 `not-owner` (the session's row belongs to another user); all four are ordinary. **It fails open,
 quietly:** one attempt, 15 seconds at most, never on a turn's clock, never a word printed. A server
 with no such tool, or one that refuses the key (HTTP 401 or 403), quiets the session's reports for
-30 minutes; an unreachable or failing server (a timeout, HTTP 429 or 5xx) for 2 minutes; the next
-good answer clears it. An end that falls inside a quiet window is not sent: the row lapses by silence.
+30 minutes; an unreachable or failing server (a timeout, HTTP 429 or 5xx), or a refusal that sets
+the session reporter credential aside, for 2 minutes, so a session shows again soon after the next
+skill registers a new one; the next good answer clears it. An end that falls inside a quiet window
+is not sent: the row lapses by silence.
 
 **A rename asked for on the Agent Fleet** comes back on a `recorded` answer as `rename`. The
 reporter keeps it (`<session>.request.json` beside the title hook's records, owner-only) and
@@ -80,13 +99,17 @@ reports send its time as `renameApplied`; a `recorded` answer without one, or an
 ## Connecting this machine
 
 The body of `/devstride:setup connect`: the one step, done once per machine, that makes the
-DevStride connection key-based. It serves the agent's DevStride tools and live status alike.
+DevStride connection key-based, for a person who wants a full key rather than the session reporter
+a browser sign-in sets up by itself. It serves the agent's DevStride tools and live status alike.
 
 It needs no repository: run it from any directory, with none of setup's repository checks.
 
 1. Run `python3 "${CLAUDE_PLUGIN_ROOT}/hooks/presence-report.py" check` and read its first line
    (and the `Fix:` line under a `NOT READY`).
-2. `AGENT CONNECTION: READY (…)` → say where the key was found, in those fixed words only, and
+2. `AGENT CONNECTION: READY (session reporter, …)` → say the machine reports through its session
+   reporter, and go on to step 3's full-key step; once the full key is connected, the reporter key
+   can be revoked under Profile Settings, API Keys. Any other
+   `AGENT CONNECTION: READY (…)` → say where the key was found, in those fixed words only, and
    stop, offering the proof (step 4). One exception: `READY (key from the environment)` while
    `claude mcp list` shows no connected `devstride` server means live status works but the skills
    have no DevStride tools: give step 3's command, which builds the connection from those same
@@ -95,8 +118,10 @@ It needs no repository: run it from any directory, with none of setup's reposito
    wrong: give the `Fix:` line it printed, then run `check` again. Never the key-creation step.
 3. `AGENT CONNECTION: NOT READY (Claude Code's configuration file cannot be read safely: …)` →
    the key may already be there: give that file's fix (`chmod 600` for `mode too open`; a link
-   replaced by the file itself), then run `check` again. Any other `NOT READY (…)` → say in plain words that this machine is connected by browser
-   sign-in only (or not at all), and that such a connection is not ready for agents. Then give the
+   replaced by the file itself), then run `check` again. `NOT READY (the session reporter credential
+   …)` → give the `Fix:` line it printed. Any other `NOT READY (…)` → say in plain words that this machine is connected by browser
+   sign-in only (or not at all), and that its next DevStride skill run sets up a session reporter
+   by itself. For a full key, give the
    one step, for the person to do **in their own terminal**: create a key in DevStride under
    Profile Settings, API Keys (a role that cannot is told to ask an administrator for the
    permission to create API keys); with the key, the secret and the organization id held in the

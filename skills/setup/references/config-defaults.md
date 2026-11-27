@@ -620,7 +620,7 @@ writing or changing the block.
 
 | Key | Shape | Absent means |
 | --- | --- | --- |
-| `presence` | `null`, or `{ "command"?: "…", "intervalMinutes"?: 5 }` | the built-in reporter: every session reports its live status to DevStride with the API key the machine's DevStride connection carries (nothing runs on a machine whose connection has no key) |
+| `presence` | `null`, or `{ "command"?: "…", "intervalMinutes"?: 5 }` | the built-in reporter: every session reports its live status to DevStride with the API key the machine's DevStride connection carries (else the session reporter credential a browser sign-in sets up; nothing runs with neither) |
 
 - **`null` switches the repository off**, the built-in reporter and any command alike;
   `DEVSTRIDE_PRESENCE=0` in the environment switches a whole machine off. Nothing else does.
@@ -667,9 +667,10 @@ fills the commands in and sets `instanceBoundTo` to what that tooling actually k
 branch inside it keeps them) or `branch`. Commands may carry `<name>` (the instance), `<base>` (the ref to
 branch from) and `<branch>` (the new branch, in the repository's own naming convention — a
 tool that defaults the branch to the instance name mints a nonconforming one) where the
-tooling needs them. This block tells the loop what exists; it never makes the loop
-concurrent — the serial-execution rule in `build-item` stands, because a per-checkout instance
-isolates dev servers and app data, not shared test infrastructure.
+tooling needs them. This block tells the loop what exists; it never makes one loop
+concurrent. Several agents share a plan only through claims, each in its own leased checkout
+(`build-item`'s "Parallel by claim"); a per-checkout instance isolates dev servers and app data,
+and test containers only when the tooling gives each checkout its own.
 
 **`recreate` exists because `migrate` and `seed` usually only go FORWARD.** Migrations do not
 un-apply and a seed rewrites rows, not schema — so an instance living on development-branch schema

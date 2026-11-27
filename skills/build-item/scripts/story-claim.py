@@ -73,7 +73,7 @@ def who(claim, tz):
     claim = claim if isinstance(claim, dict) else {}
     session = claim.get("sessionName")
     machine = claim.get("machine")
-    since = parse(claim.get("claimedAt"))
+    since = parse(claim.get("takenAt") or claim.get("claimedAt"))
     parts = ["session %s" % session if session else "an unnamed session"]
     if machine:
         parts.append("on machine %s" % machine)

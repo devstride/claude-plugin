@@ -15,7 +15,7 @@ satisfied, in the earliest-dated open container (this org: Capability/Epic) on t
 path. Priority breaks ties; earlier `startDate` breaks remaining ties. Exclude anything the gating
 check catches (`build-item` step 0's GATING CHECK — items that depend on a human/infra decision
 that is the user's). With `claims` configured it also skips a candidate another live agent holds
-(`story-claims.md`). **It also skips a candidate held for release**: one the merge answered `HELD`
+(`story-claims.md`; several agents on one plan: `parallel-building.md`). **It also skips a candidate held for release**: one the merge answered `HELD`
 for a release hold (its built branch waits, the item still in progress) is passed over while
 `release-holds.py decide` still answers held for it and its ancestors (`release-holds.md`), and
 selected again only once the hold lifts — never rebuilt while it waits.
@@ -133,21 +133,25 @@ elsewhere in the plan started earlier and still has its own unblocked story, tha
 ahead of the insert no matter how high the insert's priority is set. After any splice, re-derive
 the pick with this rule against the current plan state rather than assuming the splice worked.
 
-## Why the ready-set is shape, not a fan-out instruction
+## Several agents on one plan
 
-The ready-set this rule produces says which items COULD run next; it never says they may run at
-the same time. Test execution is serial against shared test infrastructure — runners sharing
-containers or databases corrupt each other's state — and a per-checkout instance
-(`localEnvironment.instanceBoundTo: directory`) isolates dev servers and app data, NOT that
-shared infrastructure. Add the dirty-tree abort in `branch-feature` and an MCP that writes to
-production, and a concurrent loop has three ways to damage state for one saved hour. Surfacing
-the ready-set lets a HUMAN fan the waves out deliberately; the loop itself stays serial.
+The ready-set says which items COULD run next; with claims, several agents take from it at once, each
+its own candidate, up to the plan's stored limit
+(`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/parallel-building.md`). **Free**: selectable
+by every rule above AND not held by another holder's live story claim; In Progress with no live
+claim is free, because claims are the only arbiter. **Unblocked** is unchanged, so a blocker another
+agent is still building satisfies nothing until its merge is on the integration branch on origin,
+read from `git fetch` at every pickup, never from another session's report. Each agent works in its
+own leased checkout: where the repository's tooling gives each checkout its own test containers,
+their suites run at once; where checkouts share one test database or container pair, two runs
+corrupt each other's state, so never two test runs on one pair. Without claims nothing stops two
+agents choosing the same item, and a person fans the waves out by hand.
 
 ## Cited by
 
 - `build-item` SKILL.md step 0 (canonical owner — selection, recovery, a story named by number;
   the dry-chain exit's ready rollup)
-  and the "Serial by design" rule (the ready-set-is-shape reasoning); steps 7 and 8 (landed
+  and the "Parallel by claim" rule (several agents on one plan); steps 7 and 8 (landed
   leaves, the close-out)
 - `skills/story-lifecycle/references/complete.md` (Landed leaves: an epic-branch landing)
 - `plan/references/splice-mechanics.md` (where a splice lands, and which release unit houses it),
@@ -158,3 +162,4 @@ the ready-set lets a HUMAN fan the waves out deliberately; the loop itself stays
 - `setup/references/config-defaults.md` (`releaseTarget` — when a story is Done)
 - `plan` SKILL.md (the execution-order walk)
 - `build-item/references/plan-scope.md` (the landed-subject parsing, for the plan's landed set)
+- `build-item/references/parallel-building.md` (which story a second agent takes)

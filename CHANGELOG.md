@@ -8,6 +8,138 @@ for what each version component means here and how a release is cut.
 
 ## [Unreleased]
 
+## [4.14.0] — 2026-11-26
+
+### Added
+
+- **Several agents can build one plan at the same time, up to a limit your organization stores in
+  DevStride.** Start the build command on a plan in a second terminal and a second checkout, and
+  that agent takes the next story nobody is building whose prerequisites have already landed,
+  instead of stopping. How many agents may build one plan at once is the Parallel building setting
+  on DevStride's Agents page (3 unless changed; 1 gives one agent at a time). An agent that would
+  be one too many says so plainly: it names the agents already building and since when, says which
+  setting to raise and where, and starts nothing. When nothing is free it says how many stories
+  other agents hold and how many wait on them, and stops rather than waiting. Each agent holds a
+  plan slot while it builds, kept through a stop so it can resume and given back when it finishes.
+  Without DevStride claims there is no limit, and the agent says so once. Where a repository's
+  checkouts share one local environment (no instance per checkout), only one agent per machine
+  builds a plan, so two never run their tests against the same database. Lowering the limit
+  while agents build holds back new agents until the number building falls under it, even when a
+  low slot frees first.
+- **A session signed in through the browser now shows on the Fleet.** Such a connection carries no
+  API key, so the built-in reporter had nothing to send with. Now the first prompt that runs a
+  DevStride skill asks the model to set up a session reporter for the machine through the
+  signed-in connection (the new `register_session_reporter` tool): a narrow key DevStride accepts
+  only for that member's own session reports. The machine keeps the secret
+  (`skills/build-item/scripts/reporter_credential.py`, an owner-only file in the plugin's
+  configuration folder, which on macOS and Linux it keeps closed to other users); the model and
+  DevStride see only its fingerprint. The person is told in one line what was set up and that it
+  is revoked under Profile Settings, API Keys. A full key
+  always takes its place, and the release clearance provider never reads it.
+- **`presence-report.py identity`** prints which member the machine's reporting key belongs to,
+  and doctor fails a machine that reports its sessions under someone else's key.
+
+### Changed
+
+- **Exactly one agent releases a finished epic.** When two agents land the last two stories of an
+  epic within the same minute, or a later run finds the epic waiting for its release, only one of
+  them cuts the epic's release; the others say who is releasing it and carry on with their own work.
+  With the auto-release setting on "ask", only that one agent asks.
+- **A story that loses a landing race is merged again instead of stopping.** When another agent's
+  story lands on the epic branch first and this story's push is refused, the merge step now takes
+  the moved branch into the story and runs the local checks again before landing, where it used to
+  stop. Two agents creating the same new epic branch end up on one branch.
+- **Two sessions on one machine keep their own place.** The build loop's handoff notes keep one
+  in-progress line per session, so a session resumes only its own story.
+- **Two agents on one machine no longer trip over a shared branch.** The steps that build a story
+  never switch a checkout onto a branch other agents share (an epic branch, the release train, the
+  base branch): a story lands, returns afterwards and starts from the copy on the server. A second
+  agent working in another checkout of the same repository on the same machine now carries on,
+  and retries a lost landing race, where git used to stop it with "already checked out". Only an
+  epic's release works on the epic branch itself, in the checkout of the one session releasing it;
+  if another checkout holds that branch, the release stops and names it.
+- **A resumed story whose branch was deleted from the server is pushed back.** Picking a story up
+  again always asks the server for its exact branch and pushes it when it is missing, where the
+  first pull used to fail; a branch archived under a longer name no longer counts as it.
+- **A story the loop picks is claimed before anything else.** When the loop selects the next story
+  it claims it before looking for an unfinished run of it, so it never takes over a run another
+  session on the same machine is still driving; a story another agent holds is passed over for the
+  next one.
+- **Every session start on a machine with no key says, to the person, that the session is not on
+  the Fleet yet.** It replaces the line shown once per machine to the model; the old marker file is
+  removed when found.
+- **A Mac keeps one name on the Fleet on every network.** The machine name now comes from the Mac's
+  own local name (`scutil --get LocalHostName`, asked once, with a 2-second limit) before the
+  hostname, which follows the network a Mac joins. `DEVSTRIDE_MACHINE_NAME` still wins; Linux and
+  Windows are unchanged.
+- **Doctor warns, rather than fails, about a machine with no key**, since its next skill run sets up
+  a session reporter; `/devstride:setup connect` and `/devstride:doctor` never set one up
+  themselves, and setup still gives a full key to a machine that reports through one.
+
+### Fixed
+
+- **The session that sets up a session reporter shows on the Fleet straight away.** Its start and
+  first prompt came before the machine had any key, so it used to stay off the Fleet until the
+  person typed another prompt, and a one-prompt run never showed. Its next tool call now opens its
+  Fleet row.
+- **A revoked or replaced session reporter no longer leaves the machine off the Fleet silently.**
+  When DevStride stops accepting the machine's session reporter (revoked under Profile Settings, or
+  replaced by another registration), the plugin sets it aside at its next report, so the
+  session-start line returns and the next DevStride skill sets up a new one. A refusal that sets the
+  credential aside makes running sessions wait 2 minutes, as an unreachable server or a refusal of
+  one request (an error that names its reason) does, so they show again within about two minutes of
+  that; only a refusal over HTTP, or a server without the report tool, still means 30 minutes.
+
+### Cost
+
+<!-- scripts/measure-cost.sh --table --since 89775389e7 @ 27bf3827d1, method: tokens = ceil(utf8_bytes / 3); bytes as `wc -c` -->
+| File | bytes@89775389e7 | tokens@89775389e7 | bytes now | tokens now | Δ tokens | budget |
+|---|---:|---:|---:|---:|---:|---:|
+| skills/setup/SKILL.md | 32,097 | 10,699 | 32,097 | 10,699 | +0 | 10,700 |
+| skills/review/SKILL.md | 23,994 | 7,998 | 23,994 | 7,998 | +0 | 7,999 |
+| skills/build-item/SKILL.md | 23,992 | 7,998 | 23,972 | 7,991 | -7 | 8,000 |
+| skills/doctor/SKILL.md | 23,847 | 7,949 | 23,958 | 7,986 | +37 | 8,000 |
+| skills/rationalize-gantt/SKILL.md | 12,332 | 4,111 | 12,332 | 4,111 | +0 | 4,200 |
+| skills/release/SKILL.md | 11,950 | 3,984 | 11,950 | 3,984 | +0 | 4,000 |
+| skills/pr/SKILL.md | 11,538 | 3,846 | 11,538 | 3,846 | +0 | 3,846 |
+| skills/ultracode-build/SKILL.md | 10,327 | 3,443 | 10,327 | 3,443 | +0 | 3,443 |
+| skills/rebalance/SKILL.md | 8,482 | 2,828 | 8,482 | 2,828 | +0 | 2,828 |
+| skills/plan/SKILL.md | 8,329 | 2,777 | 8,329 | 2,777 | +0 | 2,795 |
+| skills/ci-audit/SKILL.md | 7,570 | 2,524 | 7,570 | 2,524 | +0 | 2,600 |
+| skills/create-defect/SKILL.md | 6,730 | 2,244 | 6,730 | 2,244 | +0 | 2,500 |
+| skills/create-story/SKILL.md | 6,321 | 2,107 | 6,321 | 2,107 | +0 | 2,108 |
+| skills/comprehend-plan/SKILL.md | 6,073 | 2,025 | 6,073 | 2,025 | +0 | 2,100 |
+| skills/insert-defect/SKILL.md | 5,605 | 1,869 | 5,605 | 1,869 | +0 | 1,869 |
+| skills/insert-story/SKILL.md | 4,928 | 1,643 | 4,928 | 1,643 | +0 | 1,643 |
+| skills/branch-hotfix/SKILL.md | 4,906 | 1,636 | 4,906 | 1,636 | +0 | 1,636 |
+| skills/branch-feature/SKILL.md | 3,707 | 1,236 | 4,413 | 1,471 | +235 | 1,471 |
+| skills/pre-ship/SKILL.md | 3,599 | 1,200 | 3,599 | 1,200 | +0 | 1,200 |
+| skills/risk-check/SKILL.md | 3,598 | 1,200 | 3,598 | 1,200 | +0 | 1,200 |
+| skills/hotfix-steps/SKILL.md | 3,596 | 1,199 | 3,596 | 1,199 | +0 | 1,200 |
+| skills/plan-steps/SKILL.md | 3,578 | 1,193 | 3,578 | 1,193 | +0 | 1,200 |
+| skills/local-checks/SKILL.md | 3,523 | 1,175 | 3,523 | 1,175 | +0 | 1,200 |
+| skills/run-workflow/SKILL.md | 3,354 | 1,118 | 3,354 | 1,118 | +0 | 1,200 |
+| skills/release-steps/SKILL.md | 3,288 | 1,096 | 3,288 | 1,096 | +0 | 1,200 |
+| skills/merge-story/SKILL.md | 3,240 | 1,080 | 3,266 | 1,089 | +9 | 1,090 |
+| skills/review-story/SKILL.md | 3,020 | 1,007 | 3,020 | 1,007 | +0 | 1,007 |
+| skills/push/SKILL.md | 3,005 | 1,002 | 3,005 | 1,002 | +0 | 1,100 |
+| skills/claim-story/SKILL.md | 2,875 | 959 | 2,875 | 959 | +0 | 1,000 |
+| skills/update/SKILL.md | 2,799 | 933 | 2,799 | 933 | +0 | 1,000 |
+| skills/story-lifecycle/SKILL.md | 2,700 | 900 | 2,700 | 900 | +0 | 900 |
+| skills/capture-findings/SKILL.md | 2,696 | 899 | 2,696 | 899 | +0 | 900 |
+| skills/update-docs/SKILL.md | 2,614 | 872 | 2,614 | 872 | +0 | 900 |
+| skills/sync-knowledge-base/SKILL.md | 2,425 | 809 | 2,425 | 809 | +0 | 900 |
+| skills/post-deploy/SKILL.md | 2,095 | 699 | 2,095 | 699 | +0 | 700 |
+| skills/local-environment/SKILL.md | 2,083 | 695 | 2,083 | 695 | +0 | 700 |
+| skills/lease-checkout/SKILL.md | 1,892 | 631 | 1,892 | 631 | +0 | 700 |
+| skills/return-checkout/SKILL.md | 1,716 | 572 | 1,716 | 572 | +0 | 600 |
+| skills/sync-base/SKILL.md | 1,471 | 491 | 1,652 | 551 | +60 | 551 |
+| skills/pre-merge-check/SKILL.md | 1,589 | 530 | 1,589 | 530 | +0 | 600 |
+| skills/write-release-notes/SKILL.md | 1,563 | 521 | 1,563 | 521 | +0 | 600 |
+| skills/classify-release/SKILL.md | 1,423 | 475 | 1,423 | 475 | +0 | 500 |
+| alwaysOn.context (skill listing) | 6,573 | 2,191 | 6,573 | 2,191 | +0 | 2,200 |
+| **total (bodies)** | 276,470 | 92,173 | 277,474 | 92,507 | +334 | |
+
 ## [4.13.0] — 2026-11-25
 
 ### Changed
@@ -7381,7 +7513,8 @@ holes found while fixing them.
 - Initial scaffold: plugin manifest, marketplace entry, MIT license, and repository conventions.
   Installed an empty plugin — no skills yet.
 
-[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v4.13.0...HEAD
+[unreleased]: https://github.com/devstride/claude-plugin/compare/devstride--v4.14.0...HEAD
+[4.14.0]: https://github.com/devstride/claude-plugin/compare/devstride--v4.13.0...devstride--v4.14.0
 [4.13.0]: https://github.com/devstride/claude-plugin/compare/devstride--v4.12.0...devstride--v4.13.0
 [4.12.0]: https://github.com/devstride/claude-plugin/compare/devstride--v4.11.0...devstride--v4.12.0
 [4.11.0]: https://github.com/devstride/claude-plugin/compare/devstride--v4.10.0...devstride--v4.11.0

@@ -14,7 +14,7 @@ the real server does, until a report sends that object's `at` back as `renameApp
 
 Control files in the state dir (any may be absent):
   now        an ISO instant used as the server's clock (default: the real one)
-  mode       unknown-tool | http403 | http401 | http500 | http429 | bad-json | forbidden |
+  mode       unknown-tool | tool401 | toolgateway | http403 | http401 | http500 | http429 | bad-json | forbidden |
              redirect (a 302 to /followed, which marks the file `followed` when anything asks for it) |
              echo-key (a tool error whose text repeats the key and secret that arrived) — every call
              answers that way (consumed by nothing)
@@ -260,6 +260,12 @@ class Handler(BaseHTTPRequestHandler):
             return self.text("Rejected: %s / %s" % (self.headers.get("X-DevStride-Api-Key"), self.headers.get("X-DevStride-Api-Secret")), is_error=True)
         if mode == "unknown-tool":
             return self.text("Unknown tool: %s" % tool, is_error=True)
+        if mode == "tool401":  # the hosted address passed the call on and the API did not know the key
+            return self.text("DevStride 401 Unauthorized on http://127.0.0.1/v1/organizations/o/claims/presence"
+                             " \u2014 this session sends every request to acme.", is_error=True)
+        if mode == "toolgateway":  # the gateway's authorizer refused a key the API does not know
+            return self.text("Forbidden \u2014 this session sends every request to acme. If that is not the"
+                             " organization the user means, stop and tell them.", is_error=True)
         if mode == "forbidden":
             return self.text("Forbidden: missing permission MANAGE_AGENT_CLAIMS", is_error=True)
         if isinstance(args.get("payload"), dict) and "session" in args["payload"]:  # the real server's refusal
@@ -280,6 +286,8 @@ class Handler(BaseHTTPRequestHandler):
                 else:
                     answer["rename"] = asked
             return self.text(json.dumps({"data": answer}))
+        if tool == "whoami":  # the one identity a key's own call answers with
+            return self.text(json.dumps({"data": {"identity": {"username": control("username") or "keyholder"}}}))
         try:
             data = call(tool, args)
         except KeyError:

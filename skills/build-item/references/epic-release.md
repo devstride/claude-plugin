@@ -71,6 +71,17 @@ landed there; nothing reaches the train until the whole plan is complete. The co
 holds the plan — hence opt-in, the owner asked once when the plan branch ages or carries a
 migration, and never a way to hide unfinished features (a stored setting does that).
 
+## Why one release claim
+
+With several agents on one plan, two can land the last two stories of a unit within the same
+minute, and each then sees the unit at zero; a third may meet the same zero at its dry-chain exit.
+Without a claim each would cut, review and merge its own release pull request of the same branch.
+The `epic-release` claim has one winner in the database, so exactly one session releases the unit
+and the others carry on with their own loop
+(`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/parallel-building.md`). It is released NOT
+final, because a later splice may reopen the unit and need another release; it expires rather than
+blocks when its session dies, and the next run's claim takes over the open pull request.
+
 ## Why the story branch is deleted only after the epic push succeeds
 
 A rejected push of the integration branch means the story's merge exists only locally. Deleting

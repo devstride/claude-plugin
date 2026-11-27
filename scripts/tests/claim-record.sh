@@ -26,6 +26,31 @@ check("(1d) other characters become one hyphen, trimmed", cr.machine_name({}, " 
 check("(1e) an empty fleet name falls back to the hostname", cr.machine_name({"DEVSTRIDE_MACHINE_NAME": ""}, "box"), "box")
 check("(1f) nothing usable gives an empty name", cr.machine_name({}, "..."), "")
 
+# (1g-1k) on a Mac, the local name (the same on every network) is read once, with a time limit; any failure falls back
+class Done:
+    def __init__(self, code, out): self.returncode, self.stdout = code, out
+calls = []
+def scutil(code=0, out="Alices-MacBook-Pro\n", error=None):
+    def run(argv, **options):
+        calls.append((argv, options.get("timeout")))
+        if error: raise error
+        return Done(code, out)
+    return run
+cr._MAC_NAME[:] = []
+check("(1g) macOS: scutil LocalHostName, limited to 2 seconds", (cr.mac_local_name(scutil(), "darwin"), calls[-1]),
+      ("Alices-MacBook-Pro", (["scutil", "--get", "LocalHostName"], 2)))
+check("(1h) asked once per process", (cr.mac_local_name(scutil(out="Other"), "darwin"), len(calls)), ("Alices-MacBook-Pro", 1))
+cr._MAC_NAME[:] = []
+check("(1i) a time-out falls back (no name)", cr.mac_local_name(scutil(error=subprocess.TimeoutExpired("scutil", 2)), "darwin"), "")
+cr._MAC_NAME[:] = []
+check("(1j) a failed look-up falls back", cr.mac_local_name(scutil(code=1, out=""), "darwin"), "")
+cr._MAC_NAME[:] = []
+check("(1k) Linux and Windows never ask", (cr.mac_local_name(scutil(), "linux"), cr.mac_local_name(scutil(), "win32")), ("", ""))
+cr._MAC_NAME[:] = ["Alices-MacBook-Pro"]
+check("(1l) the Mac's name wins over the network's hostname, the fleet name over both",
+      (cr.machine_name({}), cr.machine_name({"DEVSTRIDE_MACHINE_NAME": "m5"})), ("alices-macbook-pro", "m5"))
+cr._MAC_NAME[:] = []
+
 # (2) the session name: the Claude Code session record (the CLAUDE_PID one first, then any naming this id), else DEVSTRIDE_SESSION
 home = os.path.join(tmp, "home"); sessions = os.path.join(home, ".claude", "sessions"); os.makedirs(sessions)
 def put(pid, record):

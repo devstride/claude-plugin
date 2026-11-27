@@ -16,11 +16,14 @@ session a presence report, whatever it is doing, through one of two reporters
     whose `command` is blank runs nothing.
   - otherwise the built-in reporter, hooks/presence-report.py, every minute (or the block's
     `intervalMinutes`): it sends the report to DevStride with the API key the machine's DevStride
-    connection carries (skills/build-item/scripts/devstride_connection.py). A session outside any
-    repository, or in one with no block, is an ordinary session reported this way. With no key
-    nothing runs and nothing is written for the session; the first SessionStart on such a machine
-    prints one line saying so, once per machine (a marker file beside the records, removed the
-    next time a key resolves). That line is the only thing this hook ever prints.
+    connection carries, else with the machine's session reporter credential
+    (skills/build-item/scripts/devstride_connection.py, reporter_credential.py). A session outside
+    any repository, or in one with no block, is an ordinary session reported this way. With neither
+    nothing runs and nothing is written for the session, and two things are said, both as JSON:
+    every SessionStart shows the person a `systemMessage` that the session is not on the Fleet
+    yet, and a prompt that runs a DevStride skill gives the model `additionalContext` asking it to
+    register a session reporter credential through the signed-in connection first. Those are the
+    only things this hook ever prints.
 
 The contract: skills/setup/references/session-presence.md.
 
@@ -151,8 +154,8 @@ three lock files), owner-only; another session's files untouched for 7 days are 
 session's start, each under its own lock; nothing is created for a session whose reporting is off
 or whose machine has no key. A record holds `top` (the repository root, null outside one) and `dir`
 (the directory the session works in); no record, marker or log ever holds a key. FAILS OPEN: every
-hook exits 0 and prints nothing but the one-time no-key line (a prompt hook's stdout would become
-context), whatever goes wrong. python3 and the standard library only.
+hook exits 0 and prints nothing but the two no-key notices (a prompt hook's stdout becomes context),
+whatever goes wrong. python3 and the standard library only.
 """
 import calendar
 import contextlib
@@ -177,8 +180,26 @@ import presence_settings  # noqa: E402  the one decision: off, the repository's 
 REPORTER = os.path.join(os.path.dirname(SCRIPT), "presence-report.py")
 QUIET_REFUSED = 1800     # seconds the built-in reporter stays quiet after a definite refusal
 QUIET_TRANSIENT = 120    # and after a failure that may pass
-NO_KEY_LINE = ("devstride: this machine's DevStride connection carries no API key, so it is not ready for agents and "
-               "this session is not shown on the Agent Fleet. Fix, once per machine: /devstride:setup connect")
+NOT_ON_FLEET = ("This session is not on the DevStride Fleet yet. It will be set up the first time you run a "
+                "DevStride skill.")
+# A prompt that runs a DevStride skill: it begins `/devstride:`, anchored like the session gate's test, and
+# never `/ds:` (installed through the short marketplace entry, the skills still invoke as `/devstride:`).
+# Never setup (connecting a full key is what it is for) or doctor (read-only), which report the missing
+# key themselves.
+SKILL_PROMPT = re.compile(r"\s*/devstride:(?!(?:setup|doctor)\b)[a-z][a-z0-9-]*\b")
+REGISTER_STEPS = (
+    "Before the DevStride skill this prompt runs: this machine's DevStride connection is a browser sign-in with no "
+    "API key, so its sessions are not on the DevStride Fleet. Set up its session reporter credential first, once, "
+    "unless you already tried in this session: (1) run `\"{python}\" \"{script}\" prepare`; it prints "
+    "`FINGERPRINT: <hex>` and `MACHINE: <name>`. (2) Call the DevStride tool `register_session_reporter` with "
+    "`machine` and `fingerprint` exactly as printed. (3) Run `\"{python}\" \"{script}\" finish --key-id <apiKey> "
+    "--org-id <organizationId> --org-slug <organizationSlug> --username <username>` with the values of its answer. "
+    "(4) Say this one line to the person: \"DevStride: this machine now reports its sessions to the Fleet with a "
+    "reporting key named Session reporter \u00b7 <machine>. Revoke it any time under Profile Settings \u2192 API "
+    "Keys.\" If a step fails (the script refuses, or the tool is missing or refuses), say instead, in one line, that "
+    "the session reporter could not be set up and why, in the failing step's own words, and that /devstride:setup "
+    "connect gives this machine a full key instead; do not try again in this session. Never print, ask for or pass "
+    "on a secret: the script keeps it. Then run the skill as asked.")
 
 SESSION_ID = re.compile(r"^[A-Za-z0-9_-][A-Za-z0-9._-]{0,127}$")
 SEMVER = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
@@ -325,7 +346,7 @@ def repo_top(start):
         here = parent
 
 
-_READINESS = []  # the last readiness word this process resolved, for the one-time line's marker
+_READINESS = []  # the last readiness word this process resolved, for the no-key notices
 
 
 def connection_ready(top, place):
@@ -335,7 +356,7 @@ def connection_ready(top, place):
     try:
         import devstride_connection  # the one place the machine's DevStride key is found
         word = devstride_connection.readiness(os.environ, devstride_connection.config_file(os.environ),
-                                              devstride_connection.project_places(top, place))
+                                              devstride_connection.project_places(top, place), reporter=True)
         _READINESS[:] = [word]
         return word in devstride_connection.READY_WORDS
     except Exception:
@@ -357,29 +378,35 @@ def settings(top, place, check_key=True):
 
 
 def marker_path():
-    """Beside the records directory, so pruning never touches it: the one-time line was shown."""
+    """Where an earlier version kept its once-per-machine note; removed when found."""
     return os.path.join(cache_dir(), "presence-no-key")
 
 
-def no_key_notice(event, reason):
-    """The only line this hook prints: at a SessionStart on a machine whose connection carries no
-    key, once (an owner-only marker records it). The marker goes the next time a key resolves for
-    the whole machine (the environment, or the user-level entry), so a machine that later loses its
-    key is told once more; a key that only one project's entry carries leaves the marker, so the
-    line is not repeated each time a session starts somewhere else."""
+def no_key_notice(event, reason, prompt=""):
+    """The only things this hook prints, both only when there is truly no key (an address that is
+    not DevStride's, or a file that cannot be read safely, is doctor's to explain): at every
+    SessionStart, a line shown to the person; at a prompt that runs a DevStride skill, the steps
+    that register this machine's session reporter credential, for the model."""
     try:
-        if reason == "builtin":
-            if _READINESS[-1:] in (["environment"], ["connection-user"]) and os.path.lexists(marker_path()):
-                os.unlink(marker_path())
-        elif reason == "no-key" and event == "SessionStart" and _READINESS[-1:] == ["no-key"]:
-            # only when there is truly no key: an address that is not DevStride's, or a configuration
-            # file that cannot be read safely, is doctor's to explain, not this line's
-            private_dir(cache_dir())
-            os.close(os.open(marker_path(), os.O_WRONLY | os.O_CREAT | os.O_EXCL | portable.flags("O_NOFOLLOW"), 0o600))
-            sys.stdout.write(NO_KEY_LINE + "\n")
-            sys.stdout.flush()
+        if os.path.lexists(marker_path()):
+            os.unlink(marker_path())
     except OSError:
-        pass  # the marker is there already (said once), or cannot be written (never said)
+        pass
+    if reason != "no-key" or _READINESS[-1:] != ["no-key"]:
+        return
+    if event == "SessionStart":
+        notice = {"systemMessage": NOT_ON_FLEET}
+    elif event == "UserPromptSubmit" and isinstance(prompt, str) and SKILL_PROMPT.match(prompt):
+        script = os.path.join(PLUGIN_ROOT, "skills/build-item/scripts", "reporter_credential.py")
+        notice = {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext":
+                  REGISTER_STEPS.format(python=sys.executable or "python3", script=script)}}
+    else:
+        return
+    try:
+        sys.stdout.write(json.dumps(notice) + "\n")
+        sys.stdout.flush()
+    except OSError:
+        pass
 
 
 _VERSION = []
@@ -866,11 +893,17 @@ def hook():
     top = repo_top(cwd)
     place = os.path.realpath(cwd)  # the directory the session works in, inside a repository or not
     here, reason = decide(top, place)
-    no_key_notice(event, reason)
+    no_key_notice(event, reason, payload.get("prompt"))
     peek = load(sid)
     if not here and not (peek and settings(peek.get("top"), peek.get("dir"))):
         return  # nothing to report, and nothing written
-    if event in LATER and (peek is None or peek.get("state") == "ended"):
+    # The one later event that may open a record: the session's start and prompt came before the
+    # machine had any key, and this session has since registered the session reporter credential
+    # (the registration steps run inside a turn). Without it the session stays off the Fleet until
+    # its next prompt, and a one-prompt run never shows at all.
+    opens = event in LATER and event != "SessionEnd" and peek is None and bool(here) \
+        and _READINESS[-1:] == ["session-reporter"]
+    if event in LATER and not opens and (peek is None or peek.get("state") == "ended"):
         return  # never reported here, or already ended
     version = own_version()
     # Once per session and version, when a keeper runs that this version did not start: a keeper from
@@ -880,7 +913,7 @@ def hook():
     retired = swept and retire_keepers(sid)  # the keeper it ended may have dropped a queued report
     mine = int(os.environ["CLAUDE_PID"]) if os.environ.get("CLAUDE_PID", "").isdigit() else 0
     # every `ps` runs here, before the state lock is taken
-    owner = owner_pid() if event in FIRST else 0
+    owner = owner_pid() if event in FIRST or opens else 0
     owner_started = started(owner) if owner else 0
     with state_lock(sid):
         now = time.time()
@@ -900,9 +933,9 @@ def hook():
         fresh = record is None
         previous = None if fresh else record.get("state")
         if event in LATER:
-            if fresh or previous == "ended":
+            if (fresh and not opens) or previous == "ended":
                 return
-            if mine and record.get("owner") not in (0, None, mine) and alive(record.get("owner")):
+            if not fresh and mine and record.get("owner") not in (0, None, mine) and alive(record.get("owner")):
                 return  # from an older process of this session, which a newer one has since resumed
         if fresh:
             record = {"schema": 1, "top": top, "dir": place, "state": None, "sent": 0, "owner": 0}
@@ -910,7 +943,10 @@ def hook():
             record["id"] = secrets.token_hex(6)  # this record's incarnation: sends are bound to it
         moved = not fresh and record.get("top") != top
         state, active = transition(event, payload, record, int(now * 1000))
-        sent, state = record.get("sent") or 0, state or previous
+        sent, state = record.get("sent") or 0, state or previous or ("working" if fresh else None)
+        if fresh and opens and isinstance(payload.get("transcript_path"), str) \
+                and 0 < len(payload["transcript_path"]) <= 4096:
+            record["transcript"] = payload["transcript_path"]  # the keeper reads it for an interrupt
         record.update({"top": top, "dir": place, "state": state, "version": version or record.get("version") or ""})
         if active:
             record["activeAt"] = int(now * 1000)  # the session's last sign of life: start, prompt, tool call, stop

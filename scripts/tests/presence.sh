@@ -14,6 +14,8 @@ cleanup() { # stop the stand-in owners and every keeper the cases started (keepe
 }
 trap cleanup EXIT
 export XDG_CACHE_HOME="$WORK/cache"
+export XDG_CONFIG_HOME="$WORK/config"   # where a session reporter credential would live
+export APPDATA="$XDG_CONFIG_HOME"   # and where it lives on native Windows, which prefers %APPDATA%
 export CLAUDE_CONFIG_DIR="$WORK/claude"   # Claude Code's own session status files (case 38b) live here
 unset CLAUDE_PID CLAUDE_CODE_SESSION_ID   # the cases name their own stand-in process
 # A maintainer's real configuration file and real key are never read: a throwaway HOME, a scratch
@@ -121,18 +123,19 @@ owner() { sleep 300 >/dev/null 2>&1 & echo "$!" >> "$WORK/owners"; echo "$!"; } 
 R="$(mkrepo repo "$(config)" "phil/26-01-01/$ITEM_NO-some-story")"
 
 # (1) no key on this machine: an absent block, a null block and a directory outside any repository
-#     send nothing and write no record. The first SessionStart says so once (the marker records it).
-NO_KEY_LINE="devstride: this machine's DevStride connection carries no API key, so it is not ready for agents and this session is not shown on the Agent Fleet. Fix, once per machine: /devstride:setup connect"
+#     send nothing and write no record. Every SessionStart shows the person one line, as JSON.
+START_JSON='{"systemMessage": "This session is not on the DevStride Fleet yet. It will be set up the first time you run a DevStride skill."}'
 N="$(mkrepo plain '{"presence":null}')"; mkdir -p "$WORK/loose"
-OUT0="$(fire SessionStart s0 "$N")$(fire UserPromptSubmit s0 "$WORK/loose")"      # a null block, and a prompt: never
-OUT1="$(fire SessionStart s0 "$(mkrepo none)" 2>&1)"                                # the first start with no key
-OUT2="$(fire SessionStart s0b "$WORK/none" 2>&1)$(fire UserPromptSubmit s0 "$WORK/loose" 2>&1)$(fire SessionStart s0c "$WORK/loose" 2>&1)$(fire Stop s0 "$WORK/none" 2>&1)"
+OUT0="$(fire SessionStart s0 "$N")$(fire UserPromptSubmit s0 "$WORK/loose")"      # a null block, and a plain prompt: never
+OUT1="$(fire SessionStart s0 "$(mkrepo none)" 2>&1)"                                # a start with no key
+OUT2="$(fire SessionStart s0b "$WORK/none" 2>&1)"                                   # and the next one: said again
+OUT3="$(fire UserPromptSubmit s0 "$WORK/loose" 2>&1)$(fire Stop s0 "$WORK/none" 2>&1)"
 sleep 0.5
 MARKER="$XDG_CACHE_HOME/devstride-plugin/presence-no-key"
-if [ -z "$OUT0" ] && [ "$OUT1" = "$NO_KEY_LINE" ] && [ -z "$OUT2" ] && [ ! -e "$RECORDS" ] && [ "$(sent)" = 0 ] \
-   && [ "$(python3 -c 'import os,stat,sys; i=os.stat(sys.argv[1]); print(oct(stat.S_IMODE(i.st_mode)), i.st_size)' "$MARKER")" = "0o600 0" ]; then
-  ok "(1) no key: no block / null / no repository → nothing sent, no record; the first SessionStart prints the one line, once (empty owner-only marker)"
-else bad "(1) out0=$OUT0 out1=$OUT1 out2=$OUT2 sent=$(sent) records=$(ls "$RECORDS" 2>&1)"; fi
+if [ -z "$OUT0" ] && [ "$OUT1" = "$START_JSON" ] && [ "$OUT2" = "$START_JSON" ] && [ -z "$OUT3" ] && [ ! -e "$RECORDS" ] \
+   && [ "$(sent)" = 0 ] && [ ! -e "$MARKER" ]; then
+  ok "(1) no key: no block / null / no repository → nothing sent, no record; every SessionStart shows the one line as a systemMessage"
+else bad "(1) out0=$OUT0 out1=$OUT1 out2=$OUT2 out3=$OUT3 sent=$(sent) records=$(ls "$RECORDS" 2>&1)"; fi
 
 # (2) session start sends `start` with every documented variable; the record is owner-only
 O1="$(owner)"
@@ -1016,30 +1019,95 @@ noconfig
 if [ -z "$USED" ]; then ok "(B4b) a \${VAR} header, a missing secret or organization, a foreign or look-alike host, another path, DevStride's real address while the tests-only one is set, another server name, a keyless entry, a file open to others, a link and an oversized file are never used: no record"
 else bad "(B4b) used:$USED"; fi
 
-# (B5) the one line: never with reporting switched off or a repository command; once with no key;
-#      the marker goes when a key appears, and the line is said once more after the key is taken away
+# (B5) the no-key notices: never with reporting switched off or a repository command; with no key, every
+#      start shows the line and a prompt that runs a DevStride skill asks the model to register a reporter
+#      credential; a key, or a reporter credential, silences both; an old once-per-machine marker is removed
 line_case() { # the cases below, in a cache of their own
   local cache="$WORK/cache-line"; local mark="$cache/devstride-plugin/presence-no-key"
   export XDG_CACHE_HOME="$cache"; nokey; noconfig
-  local quiet first again keyed lost once
+  mkdir -p "$(dirname "$mark")"; : > "$mark"
+  local quiet first again ask alias plain keyed
   quiet="$(DEVSTRIDE_PRESENCE=0 fire SessionStart b5a "$BP" 2>&1)$(fire SessionStart b5b "$N" 2>&1)$(fire SessionStart b5c "$R" 2>&1)"
-  [ -z "$quiet" ] && [ ! -e "$mark" ] || { echo "switched off or a command printed: $quiet"; return 1; }
-  first="$(fire SessionStart b5d "$BP" 2>&1)"; again="$(fire SessionStart b5e "$WORK/out" 2>&1)$(fire UserPromptSubmit b5d "$BP" 2>&1)"
-  [ "$first" = "$NO_KEY_LINE" ] && [ -z "$again" ] && [ -e "$mark" ] || { echo "first=$first again=$again"; return 1; }
-  key; keyed="$(fire SessionStart b5f "$BP" 2>&1)"; pkill -f "presence.py keeper b5f\$" 2>/dev/null
-  [ -z "$keyed" ] && [ ! -e "$mark" ] || { echo "with a key: $keyed"; return 1; }
-  nokey; lost="$(fire SessionStart b5g "$BP" 2>&1)"; once="$(fire SessionStart b5h "$BP" 2>&1)"
-  [ "$lost" = "$NO_KEY_LINE" ] && [ -z "$once" ] || { echo "lost=$lost once=$once"; return 1; }
-  # a key only one project's entry carries is not the machine's: starting there, then elsewhere, says nothing more
+  [ -z "$quiet" ] && [ ! -e "$mark" ] || { echo "switched off or a command printed: $quiet (or the marker stayed)"; return 1; }
+  first="$(fire SessionStart b5d "$BP" 2>&1)"; again="$(fire SessionStart b5e "$WORK/out" 2>&1)"
+  [ "$first" = "$START_JSON" ] && [ "$again" = "$START_JSON" ] || { echo "first=$first again=$again"; return 1; }
+  ask="$(fire UserPromptSubmit b5d "$BP" "" '{"prompt":"  /devstride:build-item I1"}' 2>&1)"
+  own="$(fire UserPromptSubmit b5d "$BP" "" '{"prompt":"/devstride:setup connect"}' 2>&1)$(fire UserPromptSubmit b5d "$BP" "" '{"prompt":"/devstride:doctor"}' 2>&1)"
+  alias="$(fire UserPromptSubmit b5d "$BP" "" '{"prompt":"/ds:build-item next"}' 2>&1)"
+  plain="$(fire UserPromptSubmit b5d "$BP" "" '{"prompt":"please run /devstride:build-item"}' 2>&1)"
+  python3 - "$ask" "$(cd "$ROOT" && pwd -P)" <<'PY' || { echo "ask=$ask"; return 1; }
+import json, sys
+for raw in sys.argv[1:2]:
+    out = json.loads(raw)["hookSpecificOutput"]
+    assert out["hookEventName"] == "UserPromptSubmit", out
+    text = out["additionalContext"]
+    assert "register_session_reporter" in text and "prepare" in text and "finish --key-id" in text, text
+    assert sys.argv[2] + "/skills/build-item/scripts/reporter_credential.py" in text, text
+    assert "Profile Settings" in text and "/devstride:setup connect" in text, text
+PY
+  [ -z "$plain" ] || { echo "a prompt not starting with a skill asked: $plain"; return 1; }
+  [ -z "$alias" ] || { echo "a /ds: prompt (which runs no skill) asked: $alias"; return 1; }
+  [ -z "$own" ] || { echo "setup or doctor asked to register: $own"; return 1; }
+  key; keyed="$(fire SessionStart b5f "$BP" 2>&1)$(fire UserPromptSubmit b5f "$BP" "" '{"prompt":"/devstride:build-item"}' 2>&1)"
+  pkill -f "presence.py keeper b5f\$" 2>/dev/null
+  [ -z "$keyed" ] || { echo "with a key: $keyed"; return 1; }
+  nokey
+  # a reporter credential is a key for the reporter: nothing is said
+  local conf="$XDG_CONFIG_HOME/devstride-plugin" reported
+  mkdir -p "$conf"; chmod 700 "$conf"
+  python3 - "$conf/session-reporter.json" <<'PY'
+import json, os, sys
+fd = os.open(sys.argv[1], os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+os.write(fd, json.dumps({"apiKey": "k-rep", "secret": "a" * 64, "organizationId": "o-1", "organizationSlug": "acme",
+                         "username": "jane", "machine": "m1"}).encode()); os.close(fd)
+PY
+  reported="$(fire SessionStart b5g "$BP" 2>&1)$(fire UserPromptSubmit b5g "$BP" "" '{"prompt":"/devstride:build-item"}' 2>&1)"
+  pkill -f "presence.py keeper b5g\$" 2>/dev/null; rm -f "$conf/session-reporter.json"
+  [ -z "$reported" ] || { echo "with a reporter credential: $reported"; return 1; }
+  # a key only one project's entry carries is that project's: there nothing is said, elsewhere the line is
   claudejson "{'projects': {'$(real "$BP")': {'mcpServers': {'devstride': E('k-proj')}}}}"
   local inproj elsewhere
   inproj="$(fire SessionStart b5i "$BP" 2>&1)"; pkill -f "presence.py keeper b5i\$" 2>/dev/null
   elsewhere="$(fire SessionStart b5j "$WORK/out" 2>&1)"; noconfig
-  [ -z "$inproj" ] && [ -z "$elsewhere" ] && [ -e "$mark" ] || { echo "project key: in=$inproj elsewhere=$elsewhere"; return 1; }
+  [ -z "$inproj" ] && [ "$elsewhere" = "$START_JSON" ] || { echo "project key: in=$inproj elsewhere=$elsewhere"; return 1; }
 }
-if WHY="$(line_case)"; then ok "(B5) the no-key line: never with DEVSTRIDE_PRESENCE=0, presence null or a repository command; once per machine; the marker goes when a key resolves and the line is said once more after the key is gone"
+if WHY="$(line_case)"; then ok "(B5) the no-key notices: never when switched off, null or a repository command; the start line every time; the register steps only for a prompt that starts with /devstride: and a skill other than setup or doctor (never /ds:); a key or a reporter credential silences both; the old marker is removed"
 else bad "(B5) $WHY"; fi
 for s in a b c d e f g h i j; do pkill -f "$HOOK keeper b5$s\$" 2>/dev/null; done
+
+# (B5b) a session that registers the reporter credential during its own turn shows straight away: its
+#       start and prompt came with no key and opened nothing, and its next tool call, once the
+#       credential is there, opens the record with a start; with no credential a tool call opens nothing
+registered_case() {
+  nokey; noconfig
+  local conf="$XDG_CONFIG_HOME/devstride-plugin"
+  fire SessionStart b5k "$BP" >/dev/null 2>&1
+  fire UserPromptSubmit b5k "$BP" "" '{"prompt":"/devstride:build-item"}' >/dev/null 2>&1
+  fire PreToolUse b5k "$BP" "" "$(tool Bash t1)" >/dev/null 2>&1
+  [ ! -e "$RECORDS/b5k.json" ] || { echo "a session with no key opened a record"; return 1; }
+  mkdir -p "$conf"; chmod 700 "$conf"
+  python3 - "$conf/session-reporter.json" <<'PY'
+import json, os, sys
+fd = os.open(sys.argv[1], os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+os.write(fd, json.dumps({"apiKey": "k-rep", "secret": "a" * 64, "organizationId": "o-1", "organizationSlug": "acme",
+                         "username": "jane", "machine": "m1"}).encode()); os.close(fd)
+PY
+  fire PostToolUse b5k "$BP" "" "$(tool Bash t1)" >/dev/null 2>&1
+  reach b5k 1 || { echo "no report after the credential appeared"; return 1; }
+  [ "$(got b5k 1 event)" = "start" ] || { echo "first report was $(got b5k 1 event)"; return 1; }
+  [ "$(rec b5k 'r["state"]')" = "working" ] || { echo "state $(rec b5k 'r["state"]')"; return 1; }
+  fire SessionEnd b5l "$BP" "" '{"reason":"other"}' >/dev/null 2>&1
+  [ ! -e "$RECORDS/b5l.json" ] || { echo "a session end opened a record"; return 1; }
+  # the same with CLAUDE_PID exported, as Claude Code does: the fresh record opens with that owner
+  local pid; pid="$(owner)"
+  CLAUDE_PID="$pid" fire PostToolUse b5m "$BP" "" "$(tool Bash t1)" >/dev/null 2>&1
+  reach b5m 1 || { echo "no report for a session with CLAUDE_PID set"; return 1; }
+  [ "$(got b5m 1 event)" = "start" ] && [ "$(rec b5m 'r["owner"]')" = "$pid" ] \
+    || { echo "with CLAUDE_PID: first report $(got b5m 1 event), owner $(rec b5m 'r["owner"]')"; return 1; }
+}
+if WHY="$(registered_case)"; then ok "(B5b) the session that registers the reporter credential shows at its next tool call, with a start, CLAUDE_PID exported or not; nothing opens without it, and an end never opens one"
+else bad "(B5b) $WHY"; fi
+pkill -f "$HOOK keeper b5k\$" 2>/dev/null; pkill -f "$HOOK keeper b5m\$" 2>/dev/null; rm -f "$XDG_CONFIG_HOME/devstride-plugin/session-reporter.json"
 
 # (B6) quiet: a server with no such tool, or refusing the key → exit 3, nothing more for 30 minutes;
 #      a failing or unreachable one → exit 4, 2 minutes; a good answer removes the note; never a word

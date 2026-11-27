@@ -28,8 +28,8 @@ first git command**: the order, both merge paths and every refusal are spelled t
    accumulates under a hold): a release hold on the item or an ancestor → `HELD <reason>`; the
    story branch waits.
 3. **Never production**: a working base equal to `release.productionBranch` → `BLOCKED`.
-4. **Exactly this commit**: the branch no longer at `commit`, or the base moved and was merged in
-   (fast) or rebased onto (pull request) → `REFRESHED`, so the runner re-earns what went stale and
+4. **Exactly this commit**: the branch no longer at `commit`, or the base moved (a refused push
+   included) and was merged in (fast) or rebased onto (pull request) → `REFRESHED`, so the runner re-earns what went stale and
    asks again.
 5. **The path is the review's**: its `path` `fast-local` → the fast merge, `pull-request` → the
    pull-request merge, each exactly as the reference spells it, the consequence notices last
