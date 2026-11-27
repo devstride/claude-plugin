@@ -209,7 +209,8 @@
         "heartbeat",
         "release",
         "adopt",
-        "owed"
+        "owed",
+        "identity"
       ],
       "verdict": "the verdict is stdout's first line; exit codes 0-5 per the provider contract",
       "calledBy": [
@@ -1776,6 +1777,12 @@
       "type": "string",
       "description": "the optional owed command",
       "since": "pre-registry"
+    },
+    {
+      "key": "release.clearance.commands.identity",
+      "type": "string",
+      "description": "the optional identity command: this session's holder, alone, for a program to read; absent, the built-in identity answers with the same rule",
+      "since": "4.16.0"
     },
     {
       "key": "claims.provider",

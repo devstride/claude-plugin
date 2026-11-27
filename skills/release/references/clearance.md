@@ -30,7 +30,9 @@ shown, and `release` runs exactly as before.** Nothing ever blocks a hotfix.
   is ignored with a `status` warning, never an error that could stop a heartbeat or a hand-back).
 - **`{ "commands": { "claim": "…", "status": "…", "heartbeat": "…", "release": "…", "adopt": "…" } }`**
   — a provider the repository supplies (a shell command per verb, run from the repository root;
-  the verb's own arguments are appended). It honours the same contract. A block with BOTH keys is a
+  the verb's own arguments are appended). It honours the same contract. `owed` and `identity` are
+  optional; with no `identity`, `${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/clearance-github.sh
+  identity` answers, by the same holder rule. A block with BOTH keys is a
   config error (`doctor` and `setup validate` report it); so is a `provider` other than `github` or
   `devstride`.
 - **`"scope"`** — `"release"` (default), `"cut-to-deploy"` (§ Scope `cut-to-deploy`) or
@@ -43,7 +45,8 @@ shown, and `release` runs exactly as before.** Nothing ever blocks a hotfix.
 ## The provider contract — six commands (and `identity`), five exit codes
 
 Every provider prints its verdict as the FIRST line of stdout and exits as follows. The skill
-reads the exit code and quotes the line; it never parses further.
+reads the exit code and quotes the line (never `identity`'s, which only a program reads); it never
+parses further.
 
 | Command | Exit 0 | Other exits |
 | --- | --- | --- |
@@ -53,7 +56,7 @@ reads the exit code and quotes the line; it never parses further.
 | `release [--force] [--owed <item>]… [--step-aside]` | `RELEASED <branch>`, or `CLEAR (nothing to release)`; with `--owed`, a second line `Close-out owed: <items>`; with `--step-aside`, `RELEASED <branch> (stepped aside)` | `4` NOT HOLDER (`--force` releases anyway, prints the record first, and is the owner's command) · `1` `--step-aside` with `--owed` or `--force` |
 | `adopt --yes [--original-stopped]` | `ADOPTED <branch> #<pr>` then `Resume: branch …, pull request …, phase …` | `2` not stale (nothing to adopt), or STUCK and still alive without `--original-stopped` · `4` nothing held |
 | `owed [--done <item>]… [--clear] [--release <name>] [--pr <n>]` | `OWED <release> #<pr> — <items> (…)` per entry, or `NONE` | never fails: the file is local and advisory |
-| `identity` | this session's holder, alone (the one verb that prints it; needs no `gh`, git or network) | `1` `ERROR: no identity` when no source below exists |
+| `identity` | this session's holder, alone (the one verb that prints it, for a program to read: its line is never quoted or shown; needs no `gh`, git or network) | `1` `ERROR: no identity` when no source below exists |
 
 - **`claim --wait`** polls every 60 s up to `waitMinutes`, printing the BUSY line each poll on
   stderr, and exits 0 the moment it wins. A STALE result ends the wait with exit 3: the skill asks
@@ -92,7 +95,8 @@ reads the exit code and quotes the line; it never parses further.
   `CLEARANCE_HOLDER_TOKEN` (the older `DEVSTRIDE_LEASE_TOKEN` is read when it is unset); else `codex:$CODEX_THREAD_ID` and/or
   `claude:$CLAUDE_CODE_SESSION_ID` joined with `+`; else `token:<random>`, printed once (stderr)
   for a plain terminal to export as `CLEARANCE_HOLDER_TOKEN`. `identity` prints it (exit `1` for the
-  random fallback), so other skills use this one rule. `user` is `gh api user`'s login; `machine` is
+  random fallback), so other skills use this one rule: they ask `identity`, never read the
+  environment for it. `user` is `gh api user`'s login; `machine` is
   the claim machine name (`claim_record.py`). A claim or adoption by the session that already holds it renews the heartbeat.
 - **Session name (display only).** `claim`, a renewing claim and `adopt` store `session` beside
   `holder`: `CLEARANCE_SESSION_NAME` (empty reads as unset), else the claim session name

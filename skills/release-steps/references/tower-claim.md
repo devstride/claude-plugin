@@ -16,12 +16,17 @@ its provider commands, exit codes and "Where the release skill calls it".
    `merge-and-deploy` it is `claim --wait --branch <release branch> --pr <n>`, followed at once
    by `heartbeat final`. The branch and number: the payload's `shape` when it is `ADOPTED`; when
    it is `NEW` (its `pullRequest` and `branch` are null: this run cut and opened them after the
-   shape was read), the open release pull request into the production branch whose
-   `devstride:release-holder` marker is this session's, and its head branch. None, or more than
-   one → `ERROR`, saying so.
+   shape was read), `open-release-pr`'s `pullRequest` (the runner's `status` with `evidence`
+   `true`, never memory) when it carries this session's `devstride:release-holder` marker, else
+   the open release pull request into the production branch with that marker; another holder's
+   is never adopted silently
+   (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/clearance.md` "Scope `merge-and-deploy`").
+   Then that pull request's head branch. It must be open. None, more than one, or closed →
+   `ERROR`, saying so.
 3. **While it waits** (the provider polls every 60 seconds, up to `waitMinutes`), say who holds the
-   tower and heartbeat the train claim while this run holds it
-   (`${CLAUDE_PLUGIN_ROOT}/skills/release-steps/references/resume-rules.md` "Heartbeats").
+   tower, shown as waiting through the runner's `wait`, and heartbeat the train claim while this
+   run holds it (`${CLAUDE_PLUGIN_ROOT}/skills/release-steps/references/resume-rules.md`
+   "Heartbeats").
 4. **Act on the exit, exactly:**
    - `0` → `CLEARED`; say who was waiting when stderr said so. Nothing reads the shape again:
      a release left stale meanwhile ends the wait with exit `3`. Under `cut-to-deploy` with a

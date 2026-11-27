@@ -337,7 +337,7 @@ reports with no other key set (its paragraph below).
 
 | Key | Shape | Absent means |
 | --- | --- | --- |
-| `release.clearance` | `null`, `{ "provider": "github" }` (optional `ref`, `staleMinutes`, `waitMinutes`, `phaseBudgetMinutes`), `{ "provider": "devstride" }` (optional `credentialsFile`, `staleMinutes`, `waitMinutes`, `phaseBudgetMinutes`), or `{ "commands": { "claim", "status", "heartbeat", "release", "adopt", "owed"? } }` | no clearance: `release` runs as before, the `release` status-line segment never renders |
+| `release.clearance` | `null`, `{ "provider": "github" }` (optional `ref`, `staleMinutes`, `waitMinutes`, `phaseBudgetMinutes`), `{ "provider": "devstride" }` (optional `credentialsFile`, `staleMinutes`, `waitMinutes`, `phaseBudgetMinutes`), or `{ "commands": { "claim", "status", "heartbeat", "release", "adopt", "owed"?, "identity"? } }` | no clearance: `release` runs as before, the `release` status-line segment never renders |
 | `claims` | `null`, `{ "provider": "devstride" }`, or `{ "commands": { "claim", "heartbeat", "release", "get"?, "list"? } }`, each with optional `expiryMinutes` | no claims: `build-item` claims nothing and says nothing |
 | `workflows` | absent, `{ "provider": "devstride" }`, `{ "commands": { "report" } }`, or `null` | reporting is on: `build-item` reports each step of its workflow through the agent's own DevStride connection, and says nothing when it cannot |
 | `releaseTower` | `{ "overrideLabel": "release-tower-override", "hotfixPattern": "*/hotfix/**" }` | those two defaults |
@@ -373,7 +373,7 @@ reports with no other key set (its paragraph below).
   readable by group or others, mode 0600), or, with neither, the key the machine's DevStride
   connection itself carries, so `credentialsFile` is needed only where that connection is not
   key-based. A repository may supply its own five commands instead
-  (a sixth, `owed`, is optional). **A block with both `provider` and `commands`, or a `provider`
+  (`owed` and `identity` are optional). **A block with both `provider` and `commands`, or a `provider`
   other than `github` or `devstride`, is a config error.** Nothing ever blocks a hotfix. Contract:
   `${CLAUDE_PLUGIN_ROOT}/skills/release/references/clearance.md`.
 - **`releaseTower`** — read by the `release-tower` GitHub check that `setup ci` offers once

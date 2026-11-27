@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v4.15.1/schemas/ds-config.schema.json",
+  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v4.16.0/schemas/ds-config.schema.json",
   "title": "DevStride delivery-loop repository config (.claude/ds-config.json)",
   "type": "object",
   "properties": {
@@ -1072,6 +1072,10 @@
                     "owed": {
                       "type": "string",
                       "description": "the optional owed command"
+                    },
+                    "identity": {
+                      "type": "string",
+                      "description": "the optional identity command: this session's holder, alone, for a program to read; absent, the built-in identity answers with the same rule"
                     }
                   },
                   "patternProperties": {

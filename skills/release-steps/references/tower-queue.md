@@ -13,9 +13,11 @@ releases merge in the order they were cut. It claims nothing and writes nothing.
    `merge-and-deploy` (or no `release.clearance` block) → `NOT APPLICABLE`. The payload's
    `shape` is `MERGED` → `NOT APPLICABLE`.
 2. **Whose pull request is this run's.** At `queue-final`, or when `shape` is `ADOPTED`, this
-   run's release pull request is open: pass `--own-pr <n>` (the shape's `pullRequest`, else the
-   open release pull request into production whose `devstride:release-holder` marker is this
-   session's), so only an OLDER one is ahead. At `queue` with a `NEW` shape, no `--own-pr`.
+   run's release pull request is open: pass `--own-pr <n>`, so only an OLDER one is ahead. `<n>`
+   is the shape's `pullRequest`, else `open-release-pr`'s `pullRequest` (the runner's `status`
+   with `evidence` `true`, never memory), else the open release pull request into production
+   whose `devstride:release-holder` marker is this session's. At `queue` with a `NEW` shape, no
+   `--own-pr`.
 3. **Read the queue**: `python3 ${CLAUDE_PLUGIN_ROOT}/skills/release/scripts/tower-queue.py check
    [--own-pr <n>] --waited-minutes <m>`, `<m>` the minutes this release has waited at this
    position so far.
