@@ -616,6 +616,31 @@ if [ "$A" = "0::none:-" ] && [ "$B" = "0::stop-1/Jane Doe/Wrong branch/session/T
   ok "(12) stop-sync: no stop → nothing kept; a new stop → kept owner-only, then acknowledged at once; an acknowledged one → one plain call; a record removed by hand comes back; an unacknowledged one is acknowledged by the next call; a newer stop replaces it; no stop → removed; a session id no record could be kept for → no call; never any output"
 else bad "(12) a=$A b=$B modes=$MODES c=$C d=$D e=$E0|$E f=$F g=$G h=$H (was $N0)"; fi
 
+# (12b) the stop check that removes a record because the stop is over leaves the session one note for
+#       its next prompt (only when this machine heard it: no name, no reason); with no record, none
+noted() { # noted SESSION — the note as "<its keys>/<at is UTC ISO>/<line opens right>", then it is taken; or "none"
+  python3 - "$ROOT" "$1" <<'PY2'
+import json, os, re, sys
+sys.path.insert(0, os.path.join(sys.argv[1], "skills/build-item/scripts"))
+import session_stop
+p = session_stop.path(sys.argv[2], kind=session_stop.LIFTED)
+note = json.load(open(p)) if os.path.exists(p) else None
+line = session_stop.take_lifted(sys.argv[2])
+if note is None:
+    print("none" if line is None and not os.path.exists(p) else "stray")
+else:
+    print("%s/%s/%s" % (",".join(sorted(note)), bool(re.match(r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$", note.get("at") or "")),
+          bool(line) and line.startswith("The stop from DevStride is over") and not os.path.exists(p)))
+PY2
+}
+N1="$(noted st1)"; N2="$(noted st1)"
+sync st1; N3="$(noted st1)"
+stop_is stop-3 '"Wrong branch"'; sync st1; rm -f "$SS/stop"; sync st1; N4="$(noted st1):$(kept st1)"
+LMODE="$(python3 -c 'import os,sys; print(oct(os.stat(sys.argv[1]).st_mode & 0o777))' "$XDG_CACHE_HOME/devstride-plugin/stop-lifted")"
+if [ "$N1" = "at/True/True" ] && [ "$N2" = none ] && [ "$N3" = none ] && [ "$N4" = "at/True/True:none" ] && [ "$LMODE" = 0o700 ]; then
+  ok "(12b) stop-sync: a stop that is over leaves one owner-only note (only when this machine heard it: no name, no reason), taken once; no record kept, no note"
+else bad "(12b) n1=$N1 n2=$N2 n3=$N3 n4=$N4 mode=$LMODE"; fi
+
 # (13) only a definite answer changes the record: an error, a refusal, a timeout, an unreachable server,
 #      an answer that names no usable stop and a machine with no key leave it as it is, kept or absent
 stop_is stop-2; sync st1; sync st2; BASE="$(short st1) $(short st2)"; rm -f "$STOPS/st2.json"

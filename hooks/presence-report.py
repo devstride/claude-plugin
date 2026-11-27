@@ -312,6 +312,8 @@ def stop_sync(environ):
         if code:
             return code  # only a definite answer changes the record
         if stop is None:
+            if kept is not None:  # a person allowed it to continue: the gate tells the session's model
+                session_stop.note_lifted(session)
             session_stop.remove(session)  # no stop, or a person allowed the session to continue
             return 0
         # the server took the acknowledgement only for the stop it still holds

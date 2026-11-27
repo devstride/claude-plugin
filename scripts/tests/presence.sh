@@ -1356,14 +1356,19 @@ else bad "(S5) unattended: owner=$HOW1 keeper-gone=$GONE1 end=$END1 kept=$KEPT1;
 #       asks at once. A keeper minute of 36 s puts the keeper's own first check 3 seconds away, so only
 #       the start's check can let the first prompt through, and the server's count is read first
 cp "$STOPS/su1.json" "$WORK/su1.stop"   # the kept stop, again for (S5c)
+told_over() { # told_over OUTPUT — whether a prompt's output is the one line saying the stop is over
+  printf '%s' "$1" | python3 -c 'import json,sys
+c = json.loads(sys.stdin.read())["hookSpecificOutput"]
+sys.exit(0 if c["hookEventName"] == "UserPromptSubmit" and c["additionalContext"].startswith("The stop from DevStride is over:") else 1)' 2>/dev/null
+}
 KEPT5B="$(kept_stop su1)"; OX5B="$(owner)"; N5B="$(asked su1 "$SX")"
 during su1 "$BP" "$OX5B" 36 "$SXURL" SessionStart resume DEVSTRIDE_UNATTENDED=1; ASKED5B=$(( $(asked su1 "$SX") - N5B ))
 PROMPT5B="$(printf '{"hook_event_name":"UserPromptSubmit","session_id":"su1","prompt":"go on"}' | python3 "$ROOT/hooks/stop-gate.py" UserPromptSubmit 2>&1)"; RC5B=$?
 AFTER5B="$(kept_stop su1):$(rec su1 'r["state"]'):$(rec su1 'r.get("unattended")'):$ASKED5B"
 sleep 3.5; kill -0 "$OX5B" 2>/dev/null; LIVE5B=$?   # past the keeper's first check: never signalled
 during su1 "$BP" "$OX5B" 36 "$SXURL" SessionEnd logout; stop_keeper su1; kill "$OX5B" 2>/dev/null
-if [ "$KEPT5B" = "stop-9 True" ] && [ "$RC5B" = 0 ] && [ -z "$PROMPT5B" ] && [ "$AFTER5B" = "none:starting:True:1" ] && [ "$LIVE5B" = 0 ]; then
-  ok "(S5b) a session a stop ended, started again once the person let it continue: its start asks the server at once, so its first prompt goes through, the kept stop is gone and the new process is never signalled"
+if [ "$KEPT5B" = "stop-9 True" ] && [ "$RC5B" = 0 ] && told_over "$PROMPT5B" && [ "$AFTER5B" = "none:starting:True:1" ] && [ "$LIVE5B" = 0 ]; then
+  ok "(S5b) a session a stop ended, started again once the person let it continue: its start asks the server at once, so its first prompt goes through, told the stop is over, the kept stop is gone and the new process is never signalled"
 else bad "(S5b) kept-before=$KEPT5B prompt=$RC5B:$PROMPT5B after=$AFTER5B alive=$LIVE5B"; fi
 
 # (S5c) the same start while the server takes 5 seconds to answer the stop check: the start goes on after
@@ -1377,10 +1382,10 @@ printf '{"hook_event_name":"UserPromptSubmit","session_id":"su1","prompt":"go on
 during su1 "$BP" "$OX5C" 120 "$SXURL" SessionEnd other   # the refused run ends
 i=0; while [ "$(kept_stop su1)" != none ] && [ $i -lt 120 ]; do sleep 0.1; i=$((i + 1)); done; LATE5C="$(kept_stop su1)"
 rm -f "$SX/stop-delay"; stop_keeper su1; kill "$OX5C" 2>/dev/null
-NEXT5C="$(printf '{"hook_event_name":"UserPromptSubmit","session_id":"su1","prompt":"go on"}' | python3 "$ROOT/hooks/stop-gate.py" UserPromptSubmit 2>&1)$?"
-if [ "$EARLY5C" = "stop-9 True" ] && [ "$RC5C" = 2 ] && [ "$LATE5C" = none ] && [ "$NEXT5C" = 0 ]; then
-  ok "(S5c) the same start while the server answers slowly: the start goes on after 3 seconds with the stop still kept, so that run's first prompt is refused, and the check it left running lands, so the next start's first prompt goes through"
-else bad "(S5c) early=$EARLY5C prompt=$RC5C late=$LATE5C next=$NEXT5C"; fi
+NEXT5C="$(printf '{"hook_event_name":"UserPromptSubmit","session_id":"su1","prompt":"go on"}' | python3 "$ROOT/hooks/stop-gate.py" UserPromptSubmit 2>&1)"; RN5C=$?
+if [ "$EARLY5C" = "stop-9 True" ] && [ "$RC5C" = 2 ] && [ "$LATE5C" = none ] && [ "$RN5C" = 0 ] && told_over "$NEXT5C"; then
+  ok "(S5c) the same start while the server answers slowly: the start goes on after 3 seconds with the stop still kept, so that run's first prompt is refused, and the check it left running lands, so the next start's first prompt goes through, told the stop is over"
+else bad "(S5c) early=$EARLY5C prompt=$RC5C late=$LATE5C next=$RN5C:$NEXT5C"; fi
 
 # (S6) the keeper's own clock, wake by wake, with nothing real asked or signalled: when it asks, how long it
 #      stays quiet after a refusal, and exactly which session it ends

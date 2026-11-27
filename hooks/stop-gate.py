@@ -3,7 +3,8 @@
 
 A PreToolUse and UserPromptSubmit hook, first in both lists. It only reads the stop record the
 session's stop check keeps on this machine (skills/build-item/scripts/session_stop.py; the check is
-hooks/presence-report.py stop-sync, run by the session's keeper): no network, no other file.
+hooks/presence-report.py stop-sync, run by the session's keeper), and the one-time note that check
+leaves when the stop is over: no network, no other file.
 
   - No record: exit 0, nothing printed.
   - A record, on PreToolUse: one JSON object on stdout that refuses the call and ends the turn,
@@ -12,6 +13,10 @@ hooks/presence-report.py stop-sync, run by the session's keeper): no network, no
     carries its session's id, so it is refused the same way.
   - A record, on UserPromptSubmit: exit 2 with the line and "Your prompt was not sent." on stderr,
     which is what the person sees; the prompt is discarded.
+  - No record but a note that the stop is over, on UserPromptSubmit: exit 0 with
+    {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit", "additionalContext": <line>}}, and
+    the note is removed. The model was last told the stop line; this tells it, once, that it may go
+    on (session_stop.take_lifted). A prompt sent while a stop is in force leaves the note in place.
 
 The line is session_stop.line(): who stopped the session, when (this machine's time), why, and
 that a person allows it to continue on Agents → Fleet. A record that exists but cannot be read
@@ -32,7 +37,8 @@ EVENTS = ("PreToolUse", "UserPromptSubmit")
 
 
 def stopped(argv):
-    """(the event, the line to print) for a stopped session, else None."""
+    """(the event, the line to print, whether it is a stop) for a stopped session, or for the first
+    prompt after a stop is over; else None."""
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "skills/build-item/scripts"))
     import portable
     import session_stop
@@ -46,7 +52,10 @@ def stopped(argv):
     if event not in EVENTS:
         return None
     stop = session_stop.read(session)
-    return None if stop is None else (event, session_stop.line(stop))
+    if stop is not None:
+        return event, session_stop.line(stop), True
+    lifted = session_stop.take_lifted(session) if event == "UserPromptSubmit" else None
+    return None if lifted is None else (event, lifted, False)
 
 
 def main(argv):
@@ -56,7 +65,11 @@ def main(argv):
         found = None
     if not found:
         return 0
-    event, line = found
+    event, line, stop = found
+    if not stop:
+        sys.stdout.write(json.dumps({"hookSpecificOutput": {
+            "hookEventName": "UserPromptSubmit", "additionalContext": line}}) + "\n")
+        return 0
     if event == "UserPromptSubmit":
         try:
             sys.stderr.reconfigure(encoding="utf-8", errors="replace")  # the line holds an arrow

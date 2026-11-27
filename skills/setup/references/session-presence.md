@@ -212,10 +212,10 @@ session reporter credential aside: the presence report decides that.
   signalled, and reports `end` with the reason `stopped`. A session with a person at it is never
   signalled.
 - **Going on.** A person allows the session to continue on Agents → Fleet: the keeper's next check
-  removes the record, and `resume` carries a workflow run on where it stopped. Removing the file by
-  hand does not let it go on: while the stop is open, the next check puts it back. A session the
-  stop ended has no keeper to hear the person, so when it is started again its start runs the
-  check at once, waiting at most 3 seconds, before its first prompt reaches the gate; a slower
+  removes the record, leaving a one-time note the gate adds to the next prompt,
+  and `resume` carries a workflow run on where it stopped. A record removed by hand comes back
+  while the stop is open. A session the stop ended has no keeper, so when started again its start
+  runs the check at once, waiting at most 3 seconds, before its first prompt reaches the gate; a slower
   answer still lands, for the start after.
 
 ## What a repository's command receives
