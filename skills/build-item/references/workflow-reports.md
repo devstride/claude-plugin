@@ -1,62 +1,54 @@
 ---
 load: contract
 ---
-# Workflow reports — telling the tracker which step the loop is on
+# Run history — the runner sends it, the agent forwards nothing
 
 The loop's steps are written down as data, `${CLAUDE_PLUGIN_ROOT}/workflows/build.json`, and the
-step runner (`${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/references/workflow-runner.md`) hands back,
-with every answer, the reports that say which step the run is on and what each produced: `reports`,
-a list of ready argument objects for the tracker's `record_workflow_step` tool. The loop only sends
-them. **Reports only observe: they never choose, reorder, gate or skip a step.**
+step runner (`${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/references/workflow-runner.md`) keeps a
+history of every run: one event for each thing that happens (the run starts; a step is handed out,
+answered, decided without being run, or waits; the run stops, is resumed, goes back, changes hands
+or ends). **The runner sends that history to DevStride itself**, with the machine's own DevStride
+key, after each command. The agent forwards nothing: an answer holds no report to send, and no
+DevStride tool is called to say where a run is. **History only observes:
+it never chooses, reorders, gates or skips a step.**
 
-## The gate
+## The switch
 
-Reporting is ON unless the repository's `.claude/ds-config.json` sets `workflows` to `null`, or the
+History is ON unless the repository's `.claude/ds-config.json` sets `workflows` to `null`, or the
 machine sets `DEVSTRIDE_WORKFLOWS` to `0` (`false`, `off` and `no` also count). An absent key means
-on. Off → send nothing for the whole run.
+on. Off → nothing is kept and nothing is sent for the whole run; switched off part-way, what
+already waits is not sent while it is off.
 
-- **Provider `devstride`** (the default, and what an absent block means): call your own DevStride
-  tool `record_workflow_step` with each object as its arguments, verbatim. Where tools load on
-  demand, load it first. A session that has no such tool reports nothing for the whole run.
-- **A `commands` block**: run `workflows.commands.report` with each object as one JSON object on
-  stdin (a file or a here-document, never inside quotes: a verdict may hold an apostrophe); its
-  first stdout line is `OK`, `ABSENT`, `FORBIDDEN`, `UNREACHABLE` or `ERROR`. A block that names
-  both a provider and a command is a config error; the command is used.
+## What the agent does: say one line, once
 
-Send the objects in the order the answer lists them, one call each, never edited, merged or
-reordered. When the tracker answers that it needs the definition (`DEFINITION_REQUIRED`), the
-object it refused was not recorded: run `status` with the refused object's `runId` (or the item)
-and `includeDefinition` once, take
-the `definition` from the object it returns, and send the REFUSED object again with that
-`definition` added (its `reports` and `run` unchanged), once; then carry on with the next object.
-The `status` object alone carries no step reports, so sending only it would lose the refused batch.
+An answer may carry `say`. Say that line to the person once, in plain words, and carry on:
 
-## Fail open, and say it once
+- *"This run's history is not reaching DevStride yet; the run carries on, and the history is sent
+  once DevStride can be reached."* DevStride could not be reached, refused the call, or is a
+  version that does not take history yet. The events wait in a file beside the run's state, the
+  runner tries again no sooner than a minute later, and a later command sends them in order: one
+  of this run, or, once this run is over, one of a later run in the same repository.
+- A line saying the rest of this run's history is not kept: DevStride holds as much as it keeps
+  for one run, or the waiting file outgrew its size. The run carries on, and nothing more is said.
 
-**Any tool failure, refusal, error line or missing tool means: send nothing more for that run and
-carry on.** The first report of a run is its availability check. On the first failure, tell the
-runner once: `reported` with the item and `"ok": false`. When its answer carries `say`, say that
-one line to the person, once, in plain words; a later failure of the same run says nothing. Never
-retry in a loop, never wait on a report, never stop or slow a step because of one; the next run
-tries again.
+**Never retry a send, never wait on one, never stop or slow a step because of one.** The runner
+gives each command one bounded try, a few seconds in all, and hands out the step whatever became
+of it. There is nothing to send again by hand: `status` with `"all": true` and `"unsent": true`
+lists the runs whose history DevStride does not hold yet, and `/devstride:doctor` reports them.
 
-## Unsent reports, at the start of a run
+## What is never sent
 
-A run whose reports failed keeps them on this machine for seven days. Once per session, before
-the first forward of its first run (and only when the gate is on), run `unsent` (its `cwd` the
-checkout). It lists only runs that are over (ended, or stopped): a run still going belongs to the
-session driving it. For each run it lists, send its `reports` objects in order, exactly as above;
-when every call for that run answered without an error, run `reported` with that `runId` and
-`"ok": true` (the runner clears an ended run's mark; a stopped one is sent again until it ends).
-Any failure → send no more of these older runs in this session and leave them marked: the next
-session that builds here tries again. The new run's own reports are not affected: they have their
-own availability check. At most ten runs are handed out, and a failure ends it at once.
+No folder of the machine (a path under a home folder starts at `~`), no transcript, no key or
+token. A wait reason that looks like a credential is withheld, and a step's evidence is cleaned as
+its verdict is.
 
 ## Cited by
 
-- `skills/build-item/SKILL.md` — The run's reports step ("read … in full before the first forward
-  of a run, or after a compaction").
-- `skills/run-workflow/SKILL.md` and `skills/run-workflow/references/workflow-runner.md` — the
-  authority for sending.
-- `skills/build-item/references/progress-table.md` — the `Workflow report` row.
-- `schemas/seam-registry.json` — the `workflows` hook's contract.
+- `skills/build-item/SKILL.md` — the run's steps ("the runner sends the run's history itself").
+- `skills/run-workflow/SKILL.md`, `skills/run-workflow/references/workflow-runner.md` and
+  `skills/run-workflow/references/step-agents.md` — what the runner keeps and sends, and what a
+  step agent therefore leaves alone.
+- `skills/plan/SKILL.md`, `skills/rebalance/SKILL.md`, `skills/release/SKILL.md` and
+  `skills/branch-hotfix/SKILL.md` — each loop's History step.
+- `skills/build-item/references/progress-table.md` — the `Run history` row.
+- `skills/setup/references/config-defaults.md` and `README.md` — the `workflows` switch.

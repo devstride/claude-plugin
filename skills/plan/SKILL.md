@@ -86,9 +86,9 @@ full before the first command, and again after a compaction.**
    first): a step agent, or here the named skill with `argument` unchanged, then `done`. The steps
    read this command's arguments (the description, the profile word, `start`, `item-days`,
    `--ticket`): a step agent's `arguments` line.
-4. **Reports.** Forward every `reports` object in order as
-   `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/workflow-reports.md` says (on by default,
-   checked once per run); a failed forward is one line, never a stop.
+4. **History.** The runner sends the run's history itself: forward nothing; say an answer's
+   `say` once (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/workflow-reports.md`); history
+   never stops a step.
 5. **`stopped`**: say why in plain words; a question → ask it, then `resume` with the person's
    reply as `answer`. **`finished`**: say the outcome (`another-round` → re-invoke on the same
    root, which extends the partial plan).

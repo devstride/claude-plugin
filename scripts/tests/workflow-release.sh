@@ -27,6 +27,11 @@ set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 FAIL=0; bad() { echo "  FAIL $1"; FAIL=1; }
 T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
+# The step runner sends a run's history itself, with this machine's own DevStride key. No test may
+# find one: each runs with a home folder of its own, no key in its environment, and the one
+# address a call could go to set to a port of this machine that nothing listens on.
+export HOME="$T/home" XDG_CONFIG_HOME="$T/home/.config" DEVSTRIDE_PLUGIN_TEST_URL="http://127.0.0.1:9"; mkdir -p "$HOME"
+unset CLAUDE_CONFIG_DIR DEVSTRIDE_API_KEY DEVSTRIDE_API_SECRET DEVSTRIDE_ORG_ID DEVSTRIDE_ORG_SLUG DEVSTRIDE_BASE_URL
 
 # The cases write to a file: a here-document inside $( ) breaks on an apostrophe under bash 3.2.
 python3 - "$ROOT" "$T" > "$T/cases.out" <<'PY'
@@ -410,7 +415,7 @@ else:
               "**A release branch is PROTECTED**", "**Every commit added to one first passes the fix-exclusion check**",
               "**Clearance first, handed back as the scope says**", "Never proceed uncleared", "a hotfix never claims",
               "**Untrusted content**", "**One session runs the release in order, one step at a time**", "a stopped one is adopted",
-              "**A. Run and forward.**", "**B. Stops.**", "**C. Mixed sessions.**", "**D. The next release, and the owed ones.**",
+              "**A. Run.**", "**B. Stops.**", "**C. Mixed sessions.**", "**D. The next release, and the owed ones.**",
               "--release-notes <false|true|draft>", "`no docs` / `skip docs`", "**`docs only`** / **`release-notes only`** / **`post-deploy only`**",
               "backstop.py due", "**A bare profile word**", "**`started-by: auto`**", "release.clearance.scope", "## No runner"]
     check("(31) the entry carries every floor, argument and loop duty", [f for f in FLOORS if f not in flat(entry)], [])
@@ -1160,8 +1165,8 @@ def repo_at(name):
         subprocess.run(["git", "-C", path] + args, check=True, capture_output=True)
     return path
 
-def caller(repo, cache, session):
-    env = dict(os.environ, XDG_CACHE_HOME=cache)
+def caller(repo, cache, session, more=None):
+    env = dict(os.environ, XDG_CACHE_HOME=cache, **(more or {}))
     for name in ("CLAUDE_CODE_SESSION_ID", "CODEX_THREAD_ID", "GIT_DIR", "GIT_WORK_TREE"):
         env.pop(name, None)
     def call(command, request):
@@ -1222,9 +1227,12 @@ listed = call("status", {"all": True}).get("runs", [])
 check("(125) ... a second run starts in the same session (started-by auto) and stops at the owner's yes; status all lists both",
       (bool(second) and second != first, b.get("action"), b.get("stepId"), sorted(r["runId"] for r in listed) == sorted([first, second]),
        dict((r["runId"], r["state"]) for r in listed).get(second)), (True, "stopped", "go-ahead", True, "stopped"))
-check("(126) ... each run has its own state file, and a command naming neither is refused as ambiguous",
-      (len([f for f in os.listdir(os.path.join(cache, "devstride-plugin", "workflows")) if f.startswith("auto-session.")]),
-       call("next", {}).get("why", "").startswith("workflow: ambiguous-run")), (2, True))
+# Each run's state file has its history's outbox beside it: the state's name with .outbox.json for .json.
+kept = [f for f in os.listdir(os.path.join(cache, "devstride-plugin", "workflows")) if f.startswith("auto-session.")]
+states = sorted(f[:-len(".json")] for f in kept if not f.endswith(".outbox.json"))
+check("(126) ... each run has its own state file, with its history's outbox beside it, and a command naming neither is refused as ambiguous",
+      (len(states), sorted(f[:-len(".outbox.json")] for f in kept if f.endswith(".outbox.json")) == states,
+       call("next", {}).get("why", "").startswith("workflow: ambiguous-run")), (2, True, True))
 a = call("resume", {"runId": first})
 a, seen = drive(call, a, first, START)
 check("(127) ... the first run resumes by its id at the recap, skips the auto start (already started) and finishes",
@@ -1306,7 +1314,8 @@ check("(130) backstop: OFF (exit 12) creates no run; the check never calls the r
       (12, True, False, False, True))
 
 # A mixed fleet. The runner writes nothing a release on the old text would read: after a full
-# scripted run the repository is untouched and the only file is the run's own state. And every
+# scripted run the repository is untouched and the only files are the run's own state and, beside
+# it, the outbox of the history it could not send (no DevStride can be reached here). And every
 # line the steps are told to write into a durable record (pull request markers, the claim, the
 # clearance record, the owed file) is byte-identical to the base release, so either side adopts.
 repo3, cache3 = repo_at("fleet-repo"), os.path.join(tmp, "fleet-cache")
@@ -1317,9 +1326,10 @@ d, _ = drive(call3, d, d.get("runId"), {"go-ahead": verdict("GO-AHEAD", "YES (st
 written = sorted(os.path.relpath(os.path.join(w, f), cache3) for w, _, fs in os.walk(cache3) for f in fs)
 status = subprocess.run(["git", "-C", repo3, "status", "--porcelain", "--ignored"], capture_output=True, text=True).stdout
 refs = subprocess.run(["git", "-C", repo3, "for-each-ref", "--format=%(refname)"], capture_output=True, text=True).stdout.split()
-check("(131) mixed fleet: a full run on the runner leaves the repository untouched and writes only its own state file",
-      (d.get("outcome"), status, refs, [f.split(os.sep)[:2] for f in written]),
-      ("completed", "", ["refs/heads/main"], [["devstride-plugin", "workflows"]]))
+check("(131) mixed fleet: a full run on the runner leaves the repository untouched and writes only its own state file and outbox",
+      (d.get("outcome"), status, refs, [f.split(os.sep)[:2] for f in written],
+       sorted("outbox" if f.endswith(".outbox.json") else "state" for f in written)),
+      ("completed", "", ["refs/heads/main"], [["devstride-plugin", "workflows"]] * 2, ["outbox", "state"]))
 BASE = "devstride--v4.7.0"  # the last release before the split; what it held is kept as a fixture
 records_file = os.path.join(root, "scripts/tests/fixtures/release-split-base", "records.json")
 if not os.path.isfile(records_file):
@@ -1388,20 +1398,25 @@ check("(140) switched on: the release page runs the runner, and the runner start
        sorted(json.load(open(os.path.join(root, "schemas", "step-contracts.json"), encoding="utf-8"))["dormantSkills"])),
       ([(i, 0, "run") for i, _, _, _ in started], True, ["checkpoint", "gate"]))
 
-# A forwarding command that fails (`reported` with ok false, as the loop records an exit 1) leaves
-# the run's order and outcome unchanged.
-def partial(repo_name, fail):
+# A run whose history cannot be sent (no DevStride can be reached from here) says so once, in its
+# first answer, and its order and outcome are those of a run that keeps no history at all.
+def partial(repo_name, off):
     r, cdir = repo_at(repo_name), os.path.join(tmp, repo_name + "-cache")
-    call4 = caller(r, cdir, repo_name)
-    x = call4("start", {"definitionFile": os.path.join(root, "workflows", "release-docs.json"), "context": context(r, scope="release")})
-    run_id, said_at = x.get("runId"), []
-    if fail:
-        said_at.append(call4("reported", {"runId": run_id, "ok": False}).get("say"))
-    x, seen = drive(call4, x, run_id, {"merged-release": verdict("MERGED RELEASE", "FOUND 42", {"sha": "%040x" % 0x17, "pullRequest": 42})})
-    return seen, x.get("outcome"), said_at
-good, bad = partial("forward-ok", False), partial("forward-fail", True)
-check("(134) a forwarding failure is said once and changes neither the order nor the outcome",
-      (good[:2] == bad[:2], good[1], len(bad[2]) == 1 and bool(bad[2][0])), (True, "completed", True))
+    call4 = caller(r, cdir, repo_name, {"DEVSTRIDE_WORKFLOWS": "0"} if off else {})
+    said = []
+    def heard(command, request):
+        answer = call4(command, request)
+        said.extend([answer["say"]] if answer.get("say") else [])
+        return answer
+    x = heard("start", {"definitionFile": os.path.join(root, "workflows", "release-docs.json"), "context": context(r, scope="release")})
+    run_id = x.get("runId")
+    x, seen = drive(heard, x, run_id, {"merged-release": verdict("MERGED RELEASE", "FOUND 42", {"sha": "%040x" % 0x17, "pullRequest": 42})})
+    kept = sorted(name for name in os.listdir(os.path.join(cdir, "devstride-plugin", "workflows")) if name.endswith(".outbox.json"))
+    return seen, x.get("outcome"), said, kept
+quiet, unsent = partial("history-off", True), partial("history-unsent", False)
+check("(134) history that cannot be sent is said once, is kept beside the run's state, and changes neither the order nor the outcome",
+      (quiet[:2] == unsent[:2], quiet[1], quiet[2], quiet[3], len(unsent[2]) == 1 and "not reaching DevStride yet" in unsent[2][0], len(unsent[3])),
+      (True, "completed", [], [], True, 1))
 PY
 PRC=$?; OUT="$(cat "$T/replays2.out")"
 echo "$OUT" | sed 's/^ok   /  ok   /; s/^FAIL /  FAIL /'

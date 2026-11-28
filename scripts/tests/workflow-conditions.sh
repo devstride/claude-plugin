@@ -15,6 +15,11 @@ set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 FAIL=0; ok() { echo "  ok   $1"; }; bad() { echo "  FAIL $1"; FAIL=1; }
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
+# The step runner sends a run's history itself, with this machine's own DevStride key. No test may
+# find one: each runs with a home folder of its own, no key in its environment, and the one
+# address a call could go to set to a port of this machine that nothing listens on.
+export HOME="$WORK/home" XDG_CONFIG_HOME="$WORK/home/.config" DEVSTRIDE_PLUGIN_TEST_URL="http://127.0.0.1:9"; mkdir -p "$HOME"
+unset CLAUDE_CONFIG_DIR DEVSTRIDE_API_KEY DEVSTRIDE_API_SECRET DEVSTRIDE_ORG_ID DEVSTRIDE_ORG_SLUG DEVSTRIDE_BASE_URL
 export PYTHONDONTWRITEBYTECODE=1
 unset CLAUDE_CODE_SESSION_ID CODEX_THREAD_ID XDG_CACHE_HOME GIT_DIR GIT_WORK_TREE
 
@@ -22,6 +27,22 @@ cat > "$WORK/cases.py" <<'PY'
 import copy, glob, importlib.util, json, os, re, shutil, subprocess, sys
 
 ROOT, WORK = sys.argv[1], sys.argv[2]
+
+
+def told(answer, cache):
+    """The runner hands out no step reports: it journals one event a transition and sends them
+    itself. Nothing here has a DevStride to send to, so `reports` on an answer below is what that
+    one command journaled, read from the run's outbox by the scenario driver (run_scenarios.py)."""
+    if not TOLD:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("run_scenarios", os.path.join(ROOT, "scripts/tests/run_scenarios.py"))
+        TOLD.append(importlib.util.module_from_spec(spec))
+        spec.loader.exec_module(TOLD[0])
+        TOLD.append({})
+    return TOLD[0].told(answer, cache, TOLD[1])
+
+
+TOLD = []
 RUNNER = "skills/run-workflow/scripts/workflow.py"
 FIX = json.load(open(os.path.join(ROOT, "skills/run-workflow/scripts/workflow-fixtures.json"), encoding="utf-8"))
 CASES = json.load(open(os.path.join(ROOT, "schemas/when-condition-fixtures.json"), encoding="utf-8"))["cases"]
@@ -156,7 +177,7 @@ class Driver:
         request = dict(request, session=self.session)
         done = subprocess.run([sys.executable, "-B", os.path.join(self.root, RUNNER), command], input=json.dumps(request),
                               capture_output=True, text=True, env=env, cwd=self.repo)
-        answer = json.loads(done.stdout) if done.returncode == 0 else None
+        answer = told(json.loads(done.stdout), self.cache) if done.returncode == 0 else None
         return done.returncode, answer, done.stdout, done.stderr
 
     def send(self, command, request):
@@ -415,8 +436,10 @@ check("CHECKPOINT: REQUESTED on a blocking checkpoint parks the run", answer["ac
 answer = run.next(gateAnswer=dict(answered("cp-1", "approve")))
 check("an approval's answer on a checkpoint keeps it waiting", answer["action"] == "parked", answer)
 answer = run.next(gateAnswer={"data": answered("cp-1", "done")})
-check("the person's done moves the run on, sending no report for the checkpoint (the tracker wrote it)",
-      answer["action"] == "run" and answer["step"]["id"] == "after" and reports(answer, "by-hand") == []
+check("the person's done moves the run on, journaled as the person's answer to that checkpoint",
+      answer["action"] == "run" and answer["step"]["id"] == "after"
+      and [(e["actor"], e["payload"]["gate"]["id"], e["payload"]["gate"]["status"]) for call in answer.get("reports", [])
+           for e in call["events"] if e.get("stepId") == "by-hand"] == [("person", "cp-1", "done")]
       and run.state()["steps"]["by-hand"]["status"] == "done" and run.state()["steps"]["by-hand"]["verdict"] == "CHECKPOINT: DONE", answer)
 run.done()
 check("the run finishes with no checkpoint left open", run.answer["action"] == "finished" and run.answer["openCheckpoints"] == [], run.answer)
@@ -430,9 +453,10 @@ check("the person's skip moves the run on, the checkpoint recorded skipped",
 run = Driver(small(by_hand(), step("after")))
 run.done()
 answer = run.done("CHECKPOINT: UNAVAILABLE the checkpoint tool is not offered\n")
-check("CHECKPOINT: UNAVAILABLE stops a blocking checkpoint, sending no failed report for it",
+check("CHECKPOINT: UNAVAILABLE stops a blocking checkpoint, journaled failed as the agent's own answer, naming no person's decision",
       answer["action"] == "stopped" and answer["kind"] == "failed" and answer["stepId"] == "by-hand"
-      and [r for r in reports(answer, "by-hand") if r["status"] == "failed"] == [], answer)
+      and [(e["actor"], e["payload"]["status"], "gate" in e["payload"]) for call in answer.get("reports", [])
+           for e in call["events"] if e.get("stepId") == "by-hand"] == [("agent", "failed", False)], answer)
 run = Driver(small(by_hand("continue"), step("after")))
 answer = run.done()
 check("a non-blocking checkpoint is requested with blocking false", answer["action"] == "request-gate" and answer["blocking"] is False, answer)

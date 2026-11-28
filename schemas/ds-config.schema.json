@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v4.16.0/schemas/ds-config.schema.json",
+  "$id": "https://raw.githubusercontent.com/devstride/claude-plugin/devstride--v5.0.0/schemas/ds-config.schema.json",
   "title": "DevStride delivery-loop repository config (.claude/ds-config.json)",
   "type": "object",
   "properties": {
@@ -95,62 +95,6 @@
                 "x-warnMaximum": 1440
               },
               "description": "kind to minutes a claim lives without a heartbeat; an unset story takes 240, release-train 30, ship-intent 20, any other kind the server's default; the release permit's own claim expires at release.clearance.staleMinutes, not here"
-            }
-          },
-          "patternProperties": {
-            "^_": {}
-          },
-          "additionalProperties": false,
-          "required": [
-            "commands"
-          ]
-        }
-      ]
-    },
-    "workflows": {
-      "description": "provider-or-commands hook — the `record_workflow_step` arguments as one JSON object (the provider sends them to the DevStride tool; a commands report receives them on stdin); with the same switch on, each run first asks `get_workflow_for_item` through the agent's own connection which workflow applies to the item, as skills/run-workflow/references/fetching-the-workflow.md says, and a failed or empty answer runs the built-in workflow; at an approval gate the agent asks a person through `request_workflow_gate` and reads the answer once through `get_workflow_gate` (skills/run-workflow/references/gates.md), and the one report that never fails open is the gate's: a gate that cannot be requested stops the run",
-      "oneOf": [
-        {
-          "type": "null"
-        },
-        {
-          "type": "object",
-          "properties": {
-            "provider": {
-              "type": "string",
-              "enum": [
-                "devstride"
-              ],
-              "description": "the built-in provider: the agent's own DevStride connection; reporting uses it whenever the block is absent"
-            }
-          },
-          "patternProperties": {
-            "^_": {}
-          },
-          "additionalProperties": false,
-          "required": [
-            "provider"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "commands": {
-              "type": "object",
-              "properties": {
-                "report": {
-                  "type": "string",
-                  "description": "the report command; the arguments arrive as JSON on stdin"
-                }
-              },
-              "patternProperties": {
-                "^_": {}
-              },
-              "additionalProperties": false,
-              "description": "a report command the repository supplies; a block that names it reports through that command instead",
-              "required": [
-                "report"
-              ]
             }
           },
           "patternProperties": {
@@ -1350,6 +1294,27 @@
       },
       "additionalProperties": false,
       "description": "production release settings"
+    },
+    "workflows": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "provider": {
+          "x-severity": "warn",
+          "description": "ignored: the step runner sends a run's history itself, with the machine's own DevStride key; remove it"
+        },
+        "commands": {
+          "x-severity": "warn",
+          "description": "ignored: no report command is run any more, the step runner sends a run's history itself; remove it"
+        }
+      },
+      "patternProperties": {
+        "^_": {}
+      },
+      "additionalProperties": false,
+      "description": "the one switch for what a workflow run tells DevStride. On (the key absent, or an object): before a run starts the agent asks DevStride which workflow applies to the item (`get_workflow_for_item`), at an approval gate it asks a person through `request_workflow_gate` and reads the answer once through `get_workflow_gate`, and the step runner keeps the run's history, one event for each thing that happens, and sends it itself with the machine's own DevStride key, so the agent forwards nothing. null switches both off for the repository, and the machine variable DEVSTRIDE_WORKFLOWS=0 for one machine: nothing is asked, kept or sent, and every run uses the built-in workflow. Sending never stops a step: history DevStride cannot take yet waits in a file beside the run's state and goes later"
     },
     "consequenceNotices": {
       "type": "object",

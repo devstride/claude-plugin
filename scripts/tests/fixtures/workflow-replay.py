@@ -4,7 +4,7 @@
   python3 scripts/tests/fixtures/workflow-replay.py <plugin root> <scenario.json>
 
 A scenario is { definition, phases?, context, script: [ {step, output} ], answers: [ ... ],
-expect: { order, outcome, stops, reportCount? } }. `definition` is a path under the plugin root or a
+expect: { order, outcome, stops } }. `definition` is a path under the plugin root or a
 definition object; `phases`, when given, keeps only those phase ids. The runner starts in a temporary
 XDG_CACHE_HOME against a throwaway git repository (`main`, plus a branch carrying one commit), loops
 `next`, feeds the output of the first unconsumed script entry for the issued step into `done`
@@ -55,8 +55,15 @@ def main():
     git(repo, "add", "-A"); git(repo, "commit", "-q", "-m", "the fix")
     head = subprocess.run(["git", "-C", repo, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
     runner = os.path.join(root, "skills/run-workflow/scripts/workflow.py")
-    env = dict(os.environ, XDG_CACHE_HOME=cache, PYTHONDONTWRITEBYTECODE="1")
-    for key in ("CLAUDE_CODE_SESSION_ID", "CODEX_THREAD_ID", "GIT_DIR", "GIT_WORK_TREE"):
+    # The runner sends a run's history itself, with the machine's own DevStride key. A replay must
+    # never find one: a home folder of its own, no key in its environment, and the one address a
+    # call could go to set to a port of this machine that nothing listens on.
+    home = os.path.join(work, "home")
+    os.makedirs(home)
+    env = dict(os.environ, XDG_CACHE_HOME=cache, PYTHONDONTWRITEBYTECODE="1", HOME=home, XDG_CONFIG_HOME=os.path.join(home, ".config"),
+               DEVSTRIDE_PLUGIN_TEST_URL="http://127.0.0.1:9")
+    for key in ("CLAUDE_CODE_SESSION_ID", "CODEX_THREAD_ID", "GIT_DIR", "GIT_WORK_TREE", "CLAUDE_CONFIG_DIR", "DEVSTRIDE_API_KEY",
+                "DEVSTRIDE_API_SECRET", "DEVSTRIDE_ORG_ID", "DEVSTRIDE_ORG_SLUG", "DEVSTRIDE_BASE_URL"):
         env.pop(key, None)
 
     def call(command, request):
@@ -68,13 +75,12 @@ def main():
 
     script = [dict(e, used=False) for e in scenario["script"]]
     answers = list(scenario.get("answers", []))
-    issued, stops, reasons, reports, waits, handed = [], [], [], 0, 0, {}
+    issued, stops, reasons, waits, handed = [], [], [], 0, {}
     # A replay is a rehearsal: it also drives step skills that are not switched on yet (the catalog's
     # dormantSkills, such as the release's). For every other definition the word changes nothing.
     answer = call("start", {"definition": definition, "context": dict(scenario["context"], cwd=repo), "rehearsal": True})
     outcome = None
     for _ in range(200):
-        reports += len(answer.get("reports") or [])
         action = answer.get("action")
         if action == "run":
             step = answer["step"]
@@ -103,8 +109,6 @@ def main():
     expect = scenario["expect"]
     got = {"order": issued, "outcome": outcome, "stops": stops}
     want = {k: expect[k] for k in ("order", "outcome", "stops")}
-    if "reportCount" in expect:
-        got["reportCount"], want["reportCount"] = reports, expect["reportCount"]
     if "waits" in expect:
         got["waits"], want["waits"] = waits, expect["waits"]
     if "stopReasons" in expect:

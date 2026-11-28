@@ -5,12 +5,17 @@
 # skills/run-workflow/scripts/workflow-fixtures.json). It walks the fast path and the pull-request
 # path, a review fix, a base refresh, a held claim and a held merge, a question and its answer, a
 # dirty checkout, local checks with nothing configured, and a definition with a step removed; and
-# every report the run produces goes back through the reporting helper's own validation.
+# every event the run journals fits the run-event schema DevStride checks.
 # Everything lives in a temporary directory: its own cache folder and repositories. No network.
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 FAIL=0; ok() { echo "  ok   $1"; }; bad() { echo "  FAIL $1"; FAIL=1; }
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
+# The step runner sends a run's history itself, with this machine's own DevStride key. No test may
+# find one: each runs with a home folder of its own, no key in its environment, and the one
+# address a call could go to set to a port of this machine that nothing listens on.
+export HOME="$WORK/home" XDG_CONFIG_HOME="$WORK/home/.config" DEVSTRIDE_PLUGIN_TEST_URL="http://127.0.0.1:9"; mkdir -p "$HOME"
+unset CLAUDE_CONFIG_DIR DEVSTRIDE_API_KEY DEVSTRIDE_API_SECRET DEVSTRIDE_ORG_ID DEVSTRIDE_ORG_SLUG DEVSTRIDE_BASE_URL
 export PYTHONDONTWRITEBYTECODE=1
 unset CLAUDE_CODE_SESSION_ID CODEX_THREAD_ID XDG_CACHE_HOME GIT_DIR GIT_WORK_TREE
 
@@ -18,6 +23,22 @@ cat > "$WORK/cases.py" <<'PY'
 import copy, importlib.util, json, os, re, subprocess, sys
 
 ROOT, WORK = sys.argv[1], sys.argv[2]
+
+
+def told(answer, cache):
+    """The runner hands out no step reports: it journals one event a transition and sends them
+    itself. Nothing here has a DevStride to send to, so `reports` on an answer below is what that
+    one command journaled, read from the run's outbox by the scenario driver (run_scenarios.py)."""
+    if not TOLD:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("run_scenarios", os.path.join(ROOT, "scripts/tests/run_scenarios.py"))
+        TOLD.append(importlib.util.module_from_spec(spec))
+        spec.loader.exec_module(TOLD[0])
+        TOLD.append({})
+    return TOLD[0].told(answer, cache, TOLD[1])
+
+
+TOLD = []
 RUNNER = os.path.join(ROOT, "skills/run-workflow/scripts/workflow.py")
 BUILD_FILE = os.path.join(ROOT, "workflows/build.json")
 BUILD = json.load(open(BUILD_FILE, encoding="utf-8"))
@@ -28,9 +49,6 @@ ORDER = [s["id"] for s in STEPS]
 CONTEXT = {"item": "I123", "goal": "Add the export button", "profile": {"name": "extended", "source": "config"},
            "workingBase": "main", "oneOff": False, "route": "epic-release", "releaseUnit": "I120",
            "reviewMoment": "release-deferred", "branchSlug": "export-button", "mode": "named"}
-spec = importlib.util.spec_from_file_location("workflow_report", os.path.join(ROOT, "skills/build-item/scripts/workflow_report.py"))
-REPORT = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(REPORT)
 counter, made = [0], [0]
 DIFF = ["diff", "--no-color", "--no-ext-diff", "--no-textconv", "--no-relative", "--src-prefix=a/", "--dst-prefix=b/",
         "--ignore-submodules=none", "--unified=3", "--no-renames", "--diff-algorithm=myers", "--inter-hunk-context=0"]
@@ -120,7 +138,7 @@ class Run:
         request = dict(request, session=self.session)
         done = subprocess.run([sys.executable, "-B", RUNNER, command], input=json.dumps(request), capture_output=True,
                               text=True, env=env, cwd=self.repo)
-        answer = json.loads(done.stdout) if done.returncode == 0 else None
+        answer = told(json.loads(done.stdout), self.cache) if done.returncode == 0 else None
         if answer is not None:
             self.answers.append(answer)
         return done.returncode, answer, done.stdout, done.stderr
@@ -213,18 +231,14 @@ check("each step is reported running, then done", [s for s in unique(statuses)] 
 check("the reports name each step's skill", set((r["stepId"], r.get("ran", {}).get("ref")) for a in run.answers for c in a.get("reports", []) for r in c.get("reports", []))
       == set((s["id"], s["run"]["ref"]) for s in STEPS))
 
-# every report object round-trips through the helper's own validation
+# every event the run journaled fits the schema DevStride checks, numbered from 1 with no hole
 calls = [c for a in run.answers for c in a.get("reports", [])]
-rebuilt = []
-for call in calls:
-    reports = [dict(r, step=r["stepId"]) for r in call.get("reports", [])]
-    try:
-        rebuilt.append(REPORT.build_report_arguments(call["runId"], call["sessionId"], reports, item_number=call.get("itemNumber"),
-                                                    repository=call.get("repository"), definition=call.get("definition"), run=call.get("run")) == call)
-    except ValueError as error:
-        rebuilt.append(str(error))
-check("every report the run produced is accepted by the reporting helper unchanged (%d calls)" % len(calls), calls and all(r is True for r in rebuilt), rebuilt)
-check("the first report carries the shipped definition", calls[0].get("definition") == BUILD)
+events = [event for call in calls for event in call["events"]]
+SCHEMA = TOLD[0].read_json(TOLD[0].SCHEMA)
+faults = [fault for event in events for fault in TOLD[0].schema_faults(event, SCHEMA)]
+check("every event the run journaled fits the run-event schema, numbered from 1 with no hole (%d events)" % len(events),
+      bool(events) and not faults and [event["clientSequence"] for event in events] == list(range(1, len(events) + 1)), faults[:3])
+check("the run's first event goes with the shipped definition", calls[0].get("definition") == BUILD)
 
 # --- the pull-request path ----------------------------------------------------------------
 run = Run(context={"route": "one-off", "oneOff": True, "reviewMoment": "pr-boundary", "workingBase": "main"})
@@ -443,21 +457,6 @@ check("the merge is handed the review's proof and the local checks' receipt",
       set(seen["merge"]["payload"]["reviewProof"]) >= {"head", "base", "path", "patchId"}
       and seen["merge"]["payload"]["localChecks"]["receipt"] and seen["merge"]["payload"]["localChecks"]["commands"], seen["merge"]["payload"])
 check("the complete step is handed the profile's source", seen["complete"]["payload"]["profileSource"] == "config", seen["complete"]["payload"])
-
-# --- a report the tracker refused for want of the definition is sent again with it ----------
-run = Run()
-run.until("build")
-refused_call = [c for c in run.answer["reports"] if c.get("reports")][-1]
-rc, status, _, _ = run.call("status", {"item": "I123", "includeDefinition": True})
-definition = status["reports"][0]["definition"]
-check("(the status object alone carries no step reports: sending only it would lose the refused batch)",
-      status["reports"][0].get("reports") in (None, []), status["reports"][0])
-resent = dict(refused_call, definition=definition)
-rebuilt = REPORT.build_report_arguments(resent["runId"], resent["sessionId"], [dict(r, step=r["stepId"]) for r in resent["reports"]],
-                                        item_number=resent.get("itemNumber"), repository=resent.get("repository"),
-                                        definition=definition, run=resent.get("run"))
-check("the refused object with the definition added is a report the helper accepts unchanged, carrying the refused steps",
-      rebuilt == resent and resent["reports"] == refused_call["reports"], (rebuilt, resent))
 
 # --- a re-issued risk check is handed only its last ACCEPTED screen --------------------------
 for verdict, extra in (("RISK CHECK: BLOCKED verifier unavailable", {}), ("RISK CHECK: NEEDS DECISION keep the token check?", {"answer": "keep it"})):

@@ -6,10 +6,11 @@ load: contract
 `${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/scripts/workflow.py` walks a workflow definition
 (`${CLAUDE_PLUGIN_ROOT}/schemas/workflow.schema.json`) against the step contract catalog
 (`${CLAUDE_PLUGIN_ROOT}/schemas/step-contracts.json`). **It decides and records; it never acts**: no
-network, no tracker call, no skill run, and git only to read. Whoever drives it runs the steps.
+skill run, git only to read, and one bounded call per command, which sends the run's own history to
+DevStride ("History", below). Whoever drives it runs the steps.
 It decides which step is next, checks each step's answer and proof, and remembers where the run is,
 also across a restart or a cleared conversation.
-This file is what a driver needs: the commands, the answers, the stops, reporting and resuming.
+This file is what a driver needs: the commands, the answers, the stops, the history and resuming.
 **Read `${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/references/workflow-contracts.md` in full before
 writing or changing a definition or a contract, or when a stop names a refused proof and you need
 why**: what `start` refuses, payloads, proofs and their bindings, the named rules, and what is
@@ -30,7 +31,7 @@ run with no item is named only by its `runId`; a session holds one open such run
 | `next` | `gateAnswer`?, `facts`? | The next action. Asked again before `done`, it hands back the issued step and attempt as they were: the step may already have acted, so only its `done` moves the run on. `gateAnswer` is what `get_workflow_gate` read for the gate or checkpoint the run is parked at (refused `not-parked` when it is parked at none). `facts` decide a condition (`need-facts`; `start`, `done` and `resume` take them too) |
 | `done` | `stepId`, `attempt`, `output` (the step's whole final answer, as text) | Records the issued step's answer and returns the next action plus `recorded`. Any other step or attempt is refused (`not-current-step`), except the step a stopped run stopped on, repaired by hand. A gate takes only `APPROVAL: REQUESTED` or `APPROVAL: UNAVAILABLE`, a checkpoint only `CHECKPOINT: REQUESTED` or `CHECKPOINT: UNAVAILABLE` (`gate-answered-by-agent`) |
 | `wait` | `stepId`, `attempt`, `reason`? (one line) | For a step that waits inside itself (a queue, a deploy, another release): the issued step is reported `waiting` with the reason, on the same attempt, until its `done`. Nothing else changes: the step still ends with its verdict, and any other step or attempt is refused (`not-current-step`). Never for a gate or a checkpoint (`wait-not-a-step`): those park the run ("Waiting and parked") |
-| `status` | `includeDefinition`?, `evidence`?; or `all`, `others`?, `cwd`? | Read-only: `state` (running, stopped, parked or finished), `position`, one row per step, a ready Markdown `table` and `parkedAt` (the gate a parked run is at: `stepId`, `id`, `since`; else null). With `includeDefinition`, one report object carrying the definition. With `evidence` `true`, each row also carries its step's recorded `evidence`, `result` and `waiting`: a later step reads them there, never from memory. With `all` `true` and no run named: `runs`, this session's unfinished runs, oldest first, each with `runId`, `item`, `workflowId`, `state`, `position`, `stopped`, `waiting` and `parkedAt`; `others` `true` adds `others`: other sessions' unfinished runs in this checkout (`cwd`), with `sessionId`, adopted by run id once that session has ended |
+| `status` | `evidence`?; or `all`, `others`?, `unsent`?, `cwd`? | Read-only: `state` (running, stopped, parked or finished), `position`, one row per step, a ready Markdown `table`, `parkedAt` (the gate a parked run is at: `stepId`, `id`, `since`; else null) and `history` (`events` kept so far, `unsent`: how many DevStride does not hold yet, `stopped`: why no more are kept, or null, `off`: true when history is switched off). With `evidence` `true`, each row also carries its step's recorded `evidence`, `result` and `waiting`: a later step reads them there, never from memory. With `all` `true` and no run named: `runs`, this session's unfinished runs, oldest first, each with `runId`, `item`, `workflowId`, `state`, `position`, `stopped`, `waiting` and `parkedAt`; `others` `true` adds `others`: other sessions' unfinished runs in this checkout (`cwd`), with `sessionId`, adopted by run id once that session has ended; `unsent` `true` adds `unsent`: every run of this user on this machine whose history DevStride does not hold yet (`runId`, `sessionId`, `item`, `events`, `since`, `ended`) |
 | `resume` | `workflow`, `answer`?, `cwd`?, `landed`?, `close`?, `beside`? | Continues after a restart or a stop, only a run of `workflow` (the id of the built-in definition this entry starts, such as `build` or `hotfix`; an organization's workflow standing in for it counts): this session's run of another workflow is refused `other-workflow`, another session's is never adopted. An issued step comes back as it was, otherwise as `next`. `answer`, a person's reply to a question, reaches that step's payload for that attempt only; at a `confirm` stop it must start with yes or no (the table below). A merge stop comes back as the stop until `landed` is `false`. `close` `true` ends the run as interrupted |
 
 The context: `item` (an item number or null), `goal`, `profile` (`name` and `source`),
@@ -65,7 +66,8 @@ An action is one of:
   **Read `${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/references/conditions.md` in full before acting
   on one.**
 
-Every answer also carries `runId` and `reports`; `start` adds the definition's hash. An answer
+Every answer also carries `runId`, and `say` when there is one line for the person ("History",
+below); `start` adds the definition's hash. An answer
 adds `decided` (`stepId`, `attempt`, `verdict`) when the runner answered steps itself from the
 repository's `.claude/ds-config.json`, with no model turn: a built-in step whose contract's
 `configSkip` rule matched (the config lacks the hook or block the step would read) is recorded done
@@ -196,33 +198,30 @@ checks and review; unsure → the stop stays
 (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/run-stops.md`). Nothing landed → `resume` with
 `"landed": false`. Until then `resume` answers with the same stop (`merge-may-have-landed`).
 
-## Reporting
+## History
 
-Every answer's `reports` is a list of ready argument objects for the tracker's step-recording tool:
-a running report when a step is issued, a finished one when it ends, at most four per object, the
-definition in a run's first object (and again after an adoption), the run's end in its last. A run
-that finishes is reported `completed`, or as the `recordsOutcome` (`landed`, `handed-up` or
-`shipped`) of its latest finished step whose verdict carries one (`COMPLETE: LANDED` → `landed`,
-`DONE` → `shipped`), when the workflow answer's `runOutcomes` lists it; a dry run (`end:dry-run`)
-`ended-early`; one held, replaced or declined (a no at a `confirm` stop) `interrupted`, never
-`landed` or `shipped`; any other stop `failed`. A `needs-person` stop ends nothing: the run stays
-open and `resume` carries it on. A tracker listing no `runOutcomes` is never told `landed`,
-`handed-up` or `shipped`. A step repaired by hand (`done` on the step a run stopped on) is reported
-as a later attempt, because the tracker never changes an attempt it holds as finished. **The runner
-never sends them.**
-`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/workflow-reports.md` is the authority for
-sending: its gate (the `workflows` key and `DEVSTRIDE_WORKFLOWS`) decides whether anything is sent
-and through which provider or command, and its fail-open rule holds as written: send nothing more
-for the run after the first failure, never retry, never stop or slow a step, tell the runner
-(`reported`, `"ok": false`) and say its one line once. `unsent` lists the runs of this repository
-on this machine that are over (ended, or stopped) and whose reports failed, each with its reports
-shaped again in full (at most ten, oldest first; read-only; state is pruned after seven days);
-`reported` with a `runId` and `"ok": true` clears an ended one after a replay.
+**The runner keeps the run's history and sends it itself; the driver forwards nothing.** One
+event per change, numbered from 1 (`${CLAUDE_PLUGIN_ROOT}/schemas/run-events.schema.json`); a
+refused command writes none. A command adds its events to an owner-only outbox beside the state,
+writes the state, then makes one bounded try (seconds) at sending what DevStride lacks, oldest
+first, with the machine's own key, then ended runs left unsent. A failed send keeps the outbox,
+waits a minute and never stops a step; `say` is one line to say once per run.
+`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/workflow-reports.md` is the authority for the
+switch (`workflows`, `DEVSTRIDE_WORKFLOWS`) and those lines.
+
+How a run's end is named to the tracker: `completed`, or the `recordsOutcome` (`landed`,
+`handed-up` or `shipped`) of its latest finished step whose verdict carries one
+(`COMPLETE: LANDED` → `landed`, `DONE` → `shipped`), when the workflow answer's `runOutcomes` lists
+it; a dry run (`end:dry-run`) `ended-early`; one held, replaced or declined (a no at a `confirm`
+stop) `interrupted`, never `landed` or `shipped`; any other stop `failed`. A `needs-person` stop
+ends nothing: the run stays open and `resume` carries it on. A tracker listing no `runOutcomes` is
+never told `landed`, `handed-up` or `shipped`. A step repaired by hand (`done` on the step a run
+stopped on) shows in the tracker as a later attempt, because the tracker never changes an attempt
+it holds as finished.
 `judge` reads an item and the tracker's answer for that item's runs and says whether the newest
 run did every step its definition requires: `complete`, `incomplete` (with the steps never
 reported, failed or never finished), `running`, `unknown` (no stored definition) or
-`not-reported`. When the tracker asks for the definition, the refused object is sent
-again with the `definition` from `status` with `includeDefinition` added, as that file says.
+`not-reported`.
 
 ## Heartbeat and ship intent
 
@@ -242,8 +241,8 @@ conversation is a new session: `resume` with the item (or the run id) adopts the
 run that another of this user's sessions left on this machine for this repository (the same
 remote, or, with none, the same git folder; another repository's is refused,
 `run-other-repository`), keeps its run id, re-binds it to the adopting checkout (`cwd`, default the
-current directory) and names the old session and checkout in `adoptedFrom`; the next report carries
-the definition again under the new session. A run parked at a gate asks its story claim step again
+current directory) and names the old session and checkout in `adoptedFrom`; its history records the
+takeover and carries on, with what the old session left unsent. A run parked at a gate asks its story claim step again
 first. Both kinds of run are adopted the same way: one with an item by the item, one with no item
 only by its run id (listed by `status` with `all` and `others`); a run with no item is never parked, because `start` refuses a gate or a
 checkpoint in it (`gate-needs-item`). A finished run is never adopted, and an adoption that

@@ -657,18 +657,18 @@ U5. **Cut the WHY before the WHAT.** Keeping a rationale while dropping its impe
 U6. **A config claim lives in more than one file** (L8) — grep them all when changing how a flag is
     honoured.
 
-## V. Workflow reports (config: `workflows`; contract: `skills/build-item/references/workflow-reports.md`)
+## V. Run history (config: `workflows`; contract: `skills/build-item/references/workflow-reports.md`)
 
-V1. Workflow reports only observe. They are on unless `workflows` is `null` or the machine sets
-    `DEVSTRIDE_WORKFLOWS` to `0`, and they fail open: any non-zero exit, unparsable
-    output, skip or tool failure means send nothing more for that run and carry on; the first
-    report of a run is its availability check; a report is never retried in a loop, never waited
-    on, never a reason to stop. The first failure of a run is told to the runner and said to the
-    person once, in one line, and never again for that run; the run's reports stay on the machine
-    and the next session of the same repository sends them (a run that could not report was
-    once simply absent from the tracker, with nothing to say why). A report never chooses,
-    reorders, gates or skips a step. The body carries the gate and the fail-open sentence itself,
-    not only the pointer.
+V1. A run's history only observes. The step runner keeps it and sends it itself, with the
+    machine's own DevStride key, and the agent forwards nothing (a model forwarding each step by
+    hand once forgot, and a run showed nothing for six steps until reminded). It is on unless
+    `workflows` is `null` or the machine sets `DEVSTRIDE_WORKFLOWS` to `0`, and it fails open: a
+    send that fails keeps the events in a file beside the run's state, is not tried again for a
+    minute, is never retried in a loop, never waited on, never a reason to stop; the person is
+    told once per run, in one line, and a later command sends what waits, in order (a run whose
+    reports failed was once simply absent from the tracker, with nothing to say why). History
+    never chooses, reorders, gates or skips a step. The body carries the forward-nothing and
+    fail-open sentence itself, not only the pointer.
 
 ## How to actually run this checklist
 
@@ -760,11 +760,12 @@ done <<'PAIRS'
 skills/build-item/SKILL.md|autoRelease
 skills/build-item/SKILL.md|workflow-reports.md
 skills/build-item/SKILL.md|never gates, delays or stops a step
-skills/build-item/SKILL.md|then report nothing
-skills/build-item/references/workflow-reports.md|a later failure of the same run says nothing
-skills/build-item/references/workflow-reports.md|send nothing more for that run
-skills/build-item/references/workflow-reports.md|never choose, reorder, gate or skip a step
-skills/build-item/references/workflow-reports.md|Unsent reports, at the start of a run
+skills/build-item/SKILL.md|forward nothing
+skills/build-item/references/workflow-reports.md|The agent forwards nothing
+skills/build-item/references/workflow-reports.md|Never retry a send
+skills/build-item/references/workflow-reports.md|nothing is kept and nothing is sent
+skills/build-item/references/workflow-reports.md|History only observes
+skills/build-item/references/workflow-reports.md|it never chooses, reorders, gates or skips a step
 skills/build-item/references/epic-release-steps.md|never a block
 skills/build-item/references/epic-release-steps.md|deleteBranchAfterRelease
 skills/build-item/references/epic-release-steps.md|NEVER rebase shared story SHAs

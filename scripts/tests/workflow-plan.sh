@@ -14,6 +14,11 @@ set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 FAIL=0; ok() { echo "  ok   $1"; }; bad() { echo "  FAIL $1"; FAIL=1; }
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
+# The step runner sends a run's history itself, with this machine's own DevStride key. No test may
+# find one: each runs with a home folder of its own, no key in its environment, and the one
+# address a call could go to set to a port of this machine that nothing listens on.
+export HOME="$WORK/home" XDG_CONFIG_HOME="$WORK/home/.config" DEVSTRIDE_PLUGIN_TEST_URL="http://127.0.0.1:9"; mkdir -p "$HOME"
+unset CLAUDE_CONFIG_DIR DEVSTRIDE_API_KEY DEVSTRIDE_API_SECRET DEVSTRIDE_ORG_ID DEVSTRIDE_ORG_SLUG DEVSTRIDE_BASE_URL
 export PYTHONDONTWRITEBYTECODE=1
 unset CLAUDE_CODE_SESSION_ID CODEX_THREAD_ID XDG_CACHE_HOME GIT_DIR GIT_WORK_TREE
 
@@ -21,6 +26,22 @@ cat > "$WORK/cases.py" <<'PY'
 import copy, importlib.util, json, os, re, shutil, subprocess, sys
 
 ROOT, WORK = sys.argv[1], sys.argv[2]
+
+
+def with_journal(answer, cache):
+    """The runner hands out no step reports: it journals one event a transition and sends them
+    itself. Nothing here has a DevStride to send to, so `reports` on an answer below is what that
+    one command journaled, read from the run's outbox by the scenario driver (run_scenarios.py)."""
+    if not TOLD:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("run_scenarios", os.path.join(ROOT, "scripts/tests/run_scenarios.py"))
+        TOLD.append(importlib.util.module_from_spec(spec))
+        spec.loader.exec_module(TOLD[0])
+        TOLD.append({})
+    return TOLD[0].told(answer, cache, TOLD[1])
+
+
+TOLD = []
 RUNNER = os.path.join(ROOT, "skills/run-workflow/scripts/workflow.py")
 CATALOG = json.load(open(os.path.join(ROOT, "schemas/step-contracts.json"), encoding="utf-8"))["contracts"]
 FILES = dict((w, os.path.join(ROOT, "workflows", w + ".json")) for w in ("plan", "rebalance"))
@@ -204,14 +225,14 @@ check("rebalance with the rewire before the dating step, as shipped, is accepted
 class Run:
     def __init__(self, definition):
         self.rc, out, err, self.cache, self.repo, self.env = start(definition)
-        self.answer = json.loads(out) if self.rc == 0 else None
+        self.answer = with_journal(json.loads(out), self.cache) if self.rc == 0 else None
         self.issued = [self.answer["step"]["id"]] if self.answer and self.answer.get("action") == "run" else []
 
     def call(self, command, request):
         request = dict(request, session="s%d" % n[0])
         done = subprocess.run([sys.executable, "-B", RUNNER, command], input=json.dumps(request), capture_output=True, text=True,
                               env=self.env, cwd=self.repo)
-        self.answer = json.loads(done.stdout) if done.returncode == 0 else {"rc": done.returncode, "err": done.stderr}
+        self.answer = with_journal(json.loads(done.stdout), self.cache) if done.returncode == 0 else {"rc": done.returncode, "err": done.stderr}
         if self.answer.get("action") == "run":
             self.issued.append(self.answer["step"]["id"])
         return self.answer

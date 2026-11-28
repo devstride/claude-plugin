@@ -255,24 +255,6 @@
       ]
     },
     {
-      "key": "workflows",
-      "shape": "provider-or-commands",
-      "valueType": "object",
-      "nullable": true,
-      "payload": "the `record_workflow_step` arguments as one JSON object (the provider sends them to the DevStride tool; a commands report receives them on stdin); with the same switch on, each run first asks `get_workflow_for_item` through the agent's own connection which workflow applies to the item, as skills/run-workflow/references/fetching-the-workflow.md says, and a failed or empty answer runs the built-in workflow; at an approval gate the agent asks a person through `request_workflow_gate` and reads the answer once through `get_workflow_gate` (skills/run-workflow/references/gates.md), and the one report that never fails open is the gate's: a gate that cannot be requested stops the run",
-      "modes": [
-        "report"
-      ],
-      "verdict": "stdout's first line (OK, ABSENT, FORBIDDEN, UNREACHABLE, ERROR), then the stored run as JSON; exit 0 ok, 1 anything else",
-      "calledBy": [
-        "build-item run",
-        "run-workflow start"
-      ],
-      "unset": "reports go to DevStride through the agent's own connection when the session has one, and with none, or a server refusing them, the run stops sending and says so once; set the key to null to switch reporting off (the machine variable DEVSTRIDE_WORKFLOWS=0 does the same)",
-      "contract": "skills/build-item/references/workflow-reports.md",
-      "since": "4.1.0"
-    },
-    {
       "key": "activeAgents.commands.start",
       "shape": "command",
       "valueType": "string",
@@ -1846,28 +1828,33 @@
       "since": "3.21.0"
     },
     {
-      "key": "workflows.provider",
-      "type": "string",
-      "enum": [
-        "devstride"
+      "key": "workflows",
+      "type": [
+        "object",
+        "null"
       ],
-      "required": true,
-      "description": "the built-in provider: the agent's own DevStride connection; reporting uses it whenever the block is absent",
+      "description": "the one switch for what a workflow run tells DevStride. On (the key absent, or an object): before a run starts the agent asks DevStride which workflow applies to the item (`get_workflow_for_item`), at an approval gate it asks a person through `request_workflow_gate` and reads the answer once through `get_workflow_gate`, and the step runner keeps the run's history, one event for each thing that happens, and sends it itself with the machine's own DevStride key, so the agent forwards nothing. null switches both off for the repository, and the machine variable DEVSTRIDE_WORKFLOWS=0 for one machine: nothing is asked, kept or sent, and every run uses the built-in workflow. Sending never stops a step: history DevStride cannot take yet waits in a file beside the run's state and goes later",
       "since": "4.1.0"
+    },
+    {
+      "key": "workflows.provider",
+      "type": "any",
+      "description": "the retired choice of who sends a run's reports",
+      "since": "4.1.0",
+      "deprecated": {
+        "severity": "warn",
+        "message": "ignored: the step runner sends a run's history itself, with the machine's own DevStride key; remove it"
+      }
     },
     {
       "key": "workflows.commands",
-      "type": "object",
-      "required": true,
-      "description": "a report command the repository supplies; a block that names it reports through that command instead",
-      "since": "4.1.0"
-    },
-    {
-      "key": "workflows.commands.report",
-      "type": "string",
-      "required": true,
-      "description": "the report command; the arguments arrive as JSON on stdin",
-      "since": "4.1.0"
+      "type": "any",
+      "description": "the retired report command",
+      "since": "4.1.0",
+      "deprecated": {
+        "severity": "warn",
+        "message": "ignored: no report command is run any more, the step runner sends a run's history itself; remove it"
+      }
     },
     {
       "key": "consequenceNotices",

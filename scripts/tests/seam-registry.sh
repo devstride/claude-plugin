@@ -234,18 +234,21 @@ copy; edit schemas/seam-registry.json 'd["hooks"][0]["step"] = "update-docs"; d[
 [ "$RC" = 1 ] && printf '%s' "$OUT" | grep -q "^REGISTRY .*stepVerdict" \
   && ok "(21) a hook naming a step without its verdict lines is a REGISTRY finding" || bad "(21) exit $RC: $OUT"
 
-# (22) the workflows seam names the two gate tools, and doctor's workflows check lists both
+# (22) the workflows switch names the two gate tools, and doctor's workflows check lists both; the
+# switch is a setting now, with no hook: the runner sends a run's history itself
 OUT="$(python3 - "$ROOT" <<'PYG'
 import json, os, sys
 root = sys.argv[1]
-hooks = {h["key"]: h for h in json.load(open(os.path.join(root, "schemas/seam-registry.json")))["hooks"]}
+registry = json.load(open(os.path.join(root, "schemas/seam-registry.json")))
+settings = {s["key"]: s for s in registry["settings"]}
 doctor = open(os.path.join(root, "skills/doctor/references/workflows-checks.md"), encoding="utf-8").read()
 names = ("request_workflow_gate", "get_workflow_gate")
-problems = ["SEAM " + n for n in names if "`%s`" % n not in hooks["workflows"]["payload"]]
+problems = ["SEAM " + n for n in names if "`%s`" % n not in settings["workflows"]["description"]]
 problems += ["DOCTOR " + n for n in names if "`%s`" % n not in doctor]
+problems += ["HOOK " + h["key"] for h in registry["hooks"] if h["key"] == "workflows" or h["key"].startswith("workflows.")]
 print("\n".join(problems) or "clean")
 PYG
 )"
-[ "$OUT" = clean ] && ok "(22) the workflows seam and doctor name request_workflow_gate and get_workflow_gate" || bad "(22) $OUT"
+[ "$OUT" = clean ] && ok "(22) the workflows switch and doctor name request_workflow_gate and get_workflow_gate, and no workflows hook is left" || bad "(22) $OUT"
 
 exit "$FAIL"

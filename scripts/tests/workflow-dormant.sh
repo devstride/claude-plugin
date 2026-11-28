@@ -34,6 +34,11 @@ set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 FAIL=0; ok() { echo "  ok   $1"; }; bad() { echo "  FAIL $1"; FAIL=1; }
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
+# The step runner sends a run's history itself, with this machine's own DevStride key. No test may
+# find one: each runs with a home folder of its own, no key in its environment, and the one
+# address a call could go to set to a port of this machine that nothing listens on.
+export HOME="$WORK/home" XDG_CONFIG_HOME="$WORK/home/.config" DEVSTRIDE_PLUGIN_TEST_URL="http://127.0.0.1:9"; mkdir -p "$HOME"
+unset CLAUDE_CONFIG_DIR DEVSTRIDE_API_KEY DEVSTRIDE_API_SECRET DEVSTRIDE_ORG_ID DEVSTRIDE_ORG_SLUG DEVSTRIDE_BASE_URL
 RECORD=""
 if [ "${1:-}" = "--record" ]; then
   [ $# -eq 2 ] && [ -d "$2" ] || { echo "usage: workflow-dormant.sh [--record <plugin root>]" >&2; exit 2; }
@@ -44,6 +49,22 @@ cat > "$WORK/cases.py" <<'PY'
 import copy, importlib.util, json, os, re, subprocess, sys
 
 ROOT, WORK, RECORD = sys.argv[1], sys.argv[2], sys.argv[3]
+
+
+def with_journal(answer, cache):
+    """The runner hands out no step reports: it journals one event a transition and sends them
+    itself. Nothing here has a DevStride to send to, so `reports` on an answer below is what that
+    one command journaled, read from the run's outbox by the scenario driver (run_scenarios.py)."""
+    if not TOLD:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("run_scenarios", os.path.join(ROOT, "scripts/tests/run_scenarios.py"))
+        TOLD.append(importlib.util.module_from_spec(spec))
+        spec.loader.exec_module(TOLD[0])
+        TOLD.append({})
+    return TOLD[0].told(answer, cache, TOLD[1])
+
+
+TOLD = []
 RUNNER = "skills/run-workflow/scripts/workflow.py"
 FIXTURE = os.path.join(ROOT, "scripts/tests/fixtures/workflow-dormant/release-4.8.1.json")
 FIX = json.load(open(os.path.join(ROOT, "skills/run-workflow/scripts/workflow-fixtures.json"), encoding="utf-8"))
@@ -147,7 +168,7 @@ class Walk:
         request = dict(request, session="s1", now=NOW)
         done = subprocess.run([sys.executable, "-B", os.path.join(self.root, RUNNER), command], input=json.dumps(request),
                               capture_output=True, text=True, env=env, cwd=self.repo)
-        answer = json.loads(done.stdout) if done.returncode == 0 else None
+        answer = with_journal(json.loads(done.stdout), self.cache) if done.returncode == 0 else None
         refusal = done.stderr.strip().split(": ")[1] if done.returncode == 2 else None  # the code, never the wording
         self.said.append({"command": command, "exit": done.returncode, "answer": self.plain(answer), "refused": refusal})
         return answer
@@ -241,7 +262,7 @@ def walks(root):
 
     w = Walk(root)
     w.to_end(w.start(fetched=organization(root, ours)))
-    w.call("status", {"item": "I123", "includeDefinition": True})
+    w.call("status", {"item": "I123"})
     out["the organization's own workflow"] = w.said
 
     w = Walk(root)
@@ -351,15 +372,49 @@ def opened_stop(old, new):
     return old
 
 
-# A waiting step that asked a person now says so (`waitingOn: "person"`), a key 4.8.1 never sent.
-# It is set aside only on a waiting report; anywhere else it stays and the comparison fails.
-def asked_person(new):
-    new = copy.deepcopy(new)
-    for batch in (new.get("answer") or {}).get("reports") or [] if isinstance(new.get("answer"), dict) else []:
-        for report in batch.get("reports") or []:
-            if report.get("status") == "waiting" and report.get("waitingOn") == "person":
-                report.pop("waitingOn")
-    return new
+# 4.8.1 handed the agent step reports to forward; this runner journals events and sends them itself.
+# What the tracker is told is compared all the same: the step rows in order, the definition and the
+# run's ending, read from 4.8.1's reports and from what each command here journaled. Two things
+# are this runner's alone and set aside: the one line it says when the history cannot be sent (no
+# DevStride can be reached from this test), and the count of events `status` shows. `status` hands
+# out nothing now: the definition 4.8.1 added to it on request goes with the run's first event. And
+# a step handed out again as it was is no new event: 4.8.1 told the tracker it was running a second
+# time, so that repeat is left out of what 4.8.1 said (a run's first report, the one carrying its
+# definition, starts the count again: the same step of a new run is new). A step waiting for a
+# person has not ended: 4.8.1 gave it the moment it stopped as an end, and the history leaves it
+# open, as the run table shows it, so that end is left out too.
+HISTORY_LINE = "This run's history is not reaching DevStride yet; the run carries on, and the history is sent once DevStride can be reached."
+
+
+def told_tracker(old, new, said_once, issued):
+    old, new = copy.deepcopy(old), copy.deepcopy(new)
+    for call, mine in ((old, False), (new, True)):
+        answer = call.get("answer")
+        if not isinstance(answer, dict):
+            continue
+        if mine:
+            said_once.extend([answer.pop("say")] if "say" in answer else [])
+            answer.pop("history", None)
+        batches = answer.pop("reports", None) or []
+        if call.get("command") == "status":
+            continue
+        keys = ("stepId", "attempt", "status", "verdict", "evidence", "ran", "startedAt", "endedAt")
+        rows = []
+        for batch in batches:
+            if not mine and "definition" in batch:
+                issued.clear()
+            for row in batch.get("reports", []):
+                if not mine and row["status"] == "running":
+                    if (row["stepId"], row["attempt"]) in issued:
+                        continue
+                    issued.add((row["stepId"], row["attempt"]))
+                if not mine and row["status"] == "waiting":
+                    row = dict((key, value) for key, value in row.items() if key != "endedAt")
+                rows.append(row)
+        answer["told"] = {"steps": [dict((key, row[key]) for key in keys if key in row) for row in rows],
+                          "ending": [batch["run"] for batch in batches if "run" in batch],
+                          "definition": [batch["definition"] for batch in batches if "definition" in batch]}
+    return old, new
 
 
 # The recorded walks no longer replayed, each with why: the fixture is never edited.
@@ -378,7 +433,7 @@ now = walks(ROOT)
 check("the same walks are recorded and run", sorted(before) == sorted(now), (sorted(before), sorted(now)))
 for name in sorted(before):
     was, said = before[name], now.get(name, [])
-    differences, extra = [], []
+    differences, extra, said_once, issued = [], [], [], set()
     for at, (old, new) in enumerate(zip(was, said)):
         new = copy.deepcopy(new)
         if isinstance(new.get("answer"), dict):
@@ -387,8 +442,8 @@ for name in sorted(before):
                     value = new["answer"].pop(key)
                     if value not in allowed:
                         extra.append("%s call %d: %s is %r" % (name, at + 1, key, value))
-        new = asked_person(new)
         old = opened_stop(old, new)
+        old, new = told_tracker(old, new, said_once, issued)
         if old.get("refused") in RENAMED_REFUSALS.get(name, {}):
             old = dict(old, refused=RENAMED_REFUSALS[name][old["refused"]])
         if old != new:
@@ -398,6 +453,8 @@ for name in sorted(before):
         differences.append("%d calls were recorded, %d were made" % (len(was), len(said)))
     check("%s: every answer equals the 4.8.1 runner's (%d calls)" % (name, len(was)), differences == [], differences[:4])
     check("%s: nothing a newer ability adds is ever set" % name, extra == [], extra[:4])
+    check("%s: the one thing said beyond 4.8.1 is that the history is not reaching DevStride, once a run" % name,
+          set(said_once) <= {HISTORY_LINE} and len(said_once) <= sum(1 for call in said if call.get("command") == "start"), said_once)
     answers = [call["answer"] for call in said if isinstance(call.get("answer"), dict)]
     actions = sorted(set(a["action"] for a in answers if "action" in a))
     check("%s: no gate, parked run, changes request or need for facts" % name, all(a in OLD_ACTIONS for a in actions), actions)

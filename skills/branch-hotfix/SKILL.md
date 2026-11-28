@@ -45,9 +45,9 @@ command, and again after a compaction.**
 2. **For each `run` answer**: invoke the named skill through the Skill tool with `argument`
    unchanged (plus ` answer: <it>` when the payload carries a person's `answer` and the argument
    does not), then `done` with `stepId`, `attempt` and the skill's WHOLE answer as `output`.
-3. **Reports**: forward every `reports` object, in order, exactly as
-   `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/workflow-reports.md` says. Reporting is on
-   by default, checked once per run, and fails open: a failure is silent or one line, never a stop.
+3. **History**: the runner sends the run's history itself: forward nothing; say an answer's
+   `say` once (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/workflow-reports.md`). On by
+   default, and it fails open: one line, never a stop.
 4. **On `stopped`** whose reason starts `NEEDS ANSWER`, `NEEDS INPUT`, `DIRTY`, `NEEDS DIRECTION`,
    `WAITING FOR YES`, `OWNER TO CONFIRM` or `PRODUCTION`: show the step's evidence in plain words and
    ask; once the person replies, `resume` with their reply as `answer`. Any other stop: say its

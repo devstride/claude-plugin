@@ -267,14 +267,19 @@ cfg '{"claims": {"provider": "redis"}}'
 expect "(44) an unknown claims provider is an ERROR" 1 "^CONFIG: 1 error(s)" '^ERROR claims.provider: "redis" is not one of "devstride"$'
 cfg '{"claims": {"commands": {"claim": "c", "release": "r"}}}'
 expect "(45) a claims commands block without heartbeat is an ERROR naming it" 1 "^CONFIG: 1 error(s)" "^ERROR claims.commands: missing required key \`heartbeat\`"
+cfg '{"workflows": {}}'
+expect "(47a) workflows as an empty object (on) is clean" 0 "$CLEAN"
 cfg '{"workflows": {"provider": "devstride"}}'
-expect "(47a) the workflows provider form is clean" 0 "$CLEAN"
-cfg '{"workflows": {"commands": {"report": "./report"}}}'
-expect "(47b) the workflows commands form is clean" 0 "$CLEAN"
+expect "(47b) the retired workflows provider is a WARN that says to remove it, exit 0" 0 "^CONFIG: 0 error(s), 1 warning(s)" \
+  "^WARN workflows.provider: deprecated — ignored: the step runner sends a run's history itself, with the machine's own DevStride key; remove it$"
 cfg '{"workflows": null}'
-expect "(47c) workflows null (reporting off) is clean" 0 "$CLEAN"
+expect "(47c) workflows null (nothing asked, kept or sent) is clean" 0 "$CLEAN"
+cfg '{"workflows": {"commands": {"report": "./report"}}}'
+expect "(47d) the retired workflows report command is a WARN that says to remove it, exit 0" 0 "^CONFIG: 0 error(s), 1 warning(s)" \
+  "^WARN workflows.commands: deprecated — ignored: no report command is run any more, the step runner sends a run's history itself; remove it$"
 cfg '{"workflows": {"provider": "other"}}'
-expect "(47d) an unknown workflows provider is an ERROR" 1 "^CONFIG: 1 error(s)" '^ERROR workflows.provider: "other" is not one of "devstride"$'
+expect "(47e) the retired provider is ignored whatever it names: the same WARN, never an ERROR" 0 "^CONFIG: 0 error(s), 1 warning(s)" \
+  "^WARN workflows.provider: deprecated — ignored"
 cfg '{"claims": {"provider": "devstride", "expiryMinutes": {"story": 0, "release-tower": 2000}}}'
 expect "(46) expiryMinutes 0 and 2000 are WARNs, exit 0" 0 "^CONFIG: 0 error(s), 2 warning(s)" \
   "^WARN claims.expiryMinutes.release-tower: 2000 is outside 1..1440; ignored, the default stands$"

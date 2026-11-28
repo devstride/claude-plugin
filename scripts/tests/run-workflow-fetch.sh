@@ -7,6 +7,11 @@
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
+# The step runner sends a run's history itself, with this machine's own DevStride key. No test may
+# find one: each runs with a home folder of its own, no key in its environment, and the one
+# address a call could go to set to a port of this machine that nothing listens on.
+export HOME="$WORK/home" XDG_CONFIG_HOME="$WORK/home/.config" DEVSTRIDE_PLUGIN_TEST_URL="http://127.0.0.1:9"; mkdir -p "$HOME"
+unset CLAUDE_CONFIG_DIR DEVSTRIDE_API_KEY DEVSTRIDE_API_SECRET DEVSTRIDE_ORG_ID DEVSTRIDE_ORG_SLUG DEVSTRIDE_BASE_URL
 export PYTHONDONTWRITEBYTECODE=1
 unset CLAUDE_CODE_SESSION_ID CODEX_THREAD_ID GIT_DIR GIT_WORK_TREE
 export XDG_CACHE_HOME="$WORK/cache"
@@ -16,6 +21,22 @@ printf '[user]\n\tname = Test\n\temail = test@example.com\n[init]\n\tdefaultBran
 python3 - "$ROOT" "$WORK" <<'PY'
 import copy, hashlib, json, os, subprocess, sys
 ROOT, WORK = sys.argv[1], sys.argv[2]
+
+
+def told(answer, cache):
+    """The runner hands out no step reports: it journals one event a transition and sends them
+    itself. Nothing here has a DevStride to send to, so `reports` on an answer below is what that
+    one command journaled, read from the run's outbox by the scenario driver (run_scenarios.py)."""
+    if not TOLD:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("run_scenarios", os.path.join(ROOT, "scripts/tests/run_scenarios.py"))
+        TOLD.append(importlib.util.module_from_spec(spec))
+        spec.loader.exec_module(TOLD[0])
+        TOLD.append({})
+    return TOLD[0].told(answer, cache, TOLD[1])
+
+
+TOLD = []
 RUNNER = os.path.join(ROOT, "skills/run-workflow/scripts/workflow.py")
 FIX = json.load(open(os.path.join(ROOT, "skills/run-workflow/scripts/fetch-fixtures.json"), encoding="utf-8"))
 REAL = json.load(open(os.path.join(ROOT, "skills/run-workflow/scripts/workflow-fixtures.json"), encoding="utf-8"))
@@ -33,7 +54,7 @@ def check(label, good, detail=""):
 def run(command, request=None, cwd=None):
     done = subprocess.run([sys.executable, "-B", RUNNER, command], input=None if request is None else json.dumps(request),
                           capture_output=True, text=True, cwd=cwd or WORK, timeout=60)
-    answer = json.loads(done.stdout) if done.returncode == 0 and done.stdout.strip() else None
+    answer = told(json.loads(done.stdout), os.environ["XDG_CACHE_HOME"]) if done.returncode == 0 and done.stdout.strip() else None
     return done.returncode, answer, done.stdout, done.stderr
 
 

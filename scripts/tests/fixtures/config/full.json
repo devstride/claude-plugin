@@ -134,7 +134,7 @@
     "categories": [{ "id": "data-retention", "title": "Changes how long data is kept", "means": "a retention period, expiry or deletion schedule changes" }]
   },
   "presence": { "command": "./tools/presence report", "intervalMinutes": 5 },
-  "workflows": { "provider": "devstride" },
+  "workflows": {},
   "sessionModels": {
     "check": true,
     "planning": { "model": "fable[1m]", "effort": "xhigh" },

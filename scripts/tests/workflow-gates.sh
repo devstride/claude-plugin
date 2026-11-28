@@ -25,6 +25,11 @@ set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 FAIL=0; ok() { echo "  ok   $1"; }; bad() { echo "  FAIL $1"; FAIL=1; }
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
+# The step runner sends a run's history itself, with this machine's own DevStride key. No test may
+# find one: each runs with a home folder of its own, no key in its environment, and the one
+# address a call could go to set to a port of this machine that nothing listens on.
+export HOME="$WORK/home" XDG_CONFIG_HOME="$WORK/home/.config" DEVSTRIDE_PLUGIN_TEST_URL="http://127.0.0.1:9"; mkdir -p "$HOME"
+unset CLAUDE_CONFIG_DIR DEVSTRIDE_API_KEY DEVSTRIDE_API_SECRET DEVSTRIDE_ORG_ID DEVSTRIDE_ORG_SLUG DEVSTRIDE_BASE_URL
 export PYTHONDONTWRITEBYTECODE=1
 unset CLAUDE_CODE_SESSION_ID CODEX_THREAD_ID XDG_CACHE_HOME GIT_DIR GIT_WORK_TREE
 
@@ -32,6 +37,22 @@ cat > "$WORK/cases.py" <<'PY'
 import copy, json, os, re, shutil, subprocess, sys
 
 ROOT, WORK = sys.argv[1], sys.argv[2]
+
+
+def told(answer, cache):
+    """The runner hands out no step reports: it journals one event a transition and sends them
+    itself. Nothing here has a DevStride to send to, so `reports` on an answer below is what that
+    one command journaled, read from the run's outbox by the scenario driver (run_scenarios.py)."""
+    if not TOLD:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("run_scenarios", os.path.join(ROOT, "scripts/tests/run_scenarios.py"))
+        TOLD.append(importlib.util.module_from_spec(spec))
+        spec.loader.exec_module(TOLD[0])
+        TOLD.append({})
+    return TOLD[0].told(answer, cache, TOLD[1])
+
+
+TOLD = []
 RUNNER = "skills/run-workflow/scripts/workflow.py"
 FIX = json.load(open(os.path.join(ROOT, "skills/run-workflow/scripts/workflow-fixtures.json"), encoding="utf-8"))
 SKILLS = ["claim-story", "story-lifecycle", "branch-feature", "ultracode-build", "risk-check", "local-checks", "review-story",
@@ -156,7 +177,7 @@ class Driver:
         request = dict(request, session=session or self.session)
         done = subprocess.run([sys.executable, "-B", os.path.join(self.root, RUNNER), command], input=json.dumps(request),
                               capture_output=True, text=True, env=env, cwd=self.repo)
-        answer = json.loads(done.stdout) if done.returncode == 0 else None
+        answer = told(json.loads(done.stdout), self.cache) if done.returncode == 0 else None
         if answer is not None:
             self.answers.append(answer)
         return done.returncode, answer, done.stdout, done.stderr
@@ -193,6 +214,14 @@ def refused(result, code):
 def gate_reports(answer, status=None):
     return [r for call in answer.get("reports", []) for r in call.get("reports", [])
             if r.get("stepId") == "approve" and (status is None or r.get("status") == status)]
+
+
+def gate_answers(answer, step="approve"):
+    """Each answer of a person a command journaled for a gate step: who the event says answered, the
+    gate it names and what they said. A person's answer is the person's event, never the agent's."""
+    return [(e["actor"], e["payload"]["gate"]["id"], e["payload"]["gate"]["status"])
+            for call in (answer or {}).get("reports", []) for e in call.get("events", [])
+            if e.get("stepId") == step and e["type"] == "step-answered" and (e["payload"].get("gate") or {}).get("status")]
 
 
 def closes(answer, outcome):
@@ -295,7 +324,7 @@ check("a parked gate's report says a person is asked", [r.get("waitingOn") for r
 check("the gate's id is kept in the run's state file", run.state()["steps"]["approve"]["gate"] == {"id": "gate-1", "since": SINCE})
 first, second = run.call("next", {"item": "I123"})[1], run.call("next", {"item": "I123"})[1]
 check("next while parked is wait, the same both times, and reports nothing new",
-      first == second and first["action"] == "parked" and first["reports"] == [], (first, second))
+      first == second and first["action"] == "parked" and "reports" not in first, (first, second))
 status = run.call("status", {"item": "I123"})[1]
 check("status names the gate the run waits at", status["parkedAt"] == {"id": "gate-1", "since": SINCE, "stepId": "approve"}
       and status["position"]["stepId"] == "approve", status)
@@ -321,7 +350,8 @@ check("a gate answer that is not an object is refused", refused(result, "bad-req
 answer = run.next(gateAnswer={"data": {"gate": {"id": "gate-1", "status": "changes", "note": "Rename the button to Export CSV"}}})
 check("a changes answer is address-changes, with the person's note and the next attempt",
       answer["action"] == "address-changes" and answer["note"] == "Rename the button to Export CSV" and answer["attempt"] == 2, answer)
-check("the runner sends no report for a person's answer (the tracker wrote it)", gate_reports(answer) == [], gate_reports(answer))
+check("a person's answer is journaled as the person's own, naming the gate and what they said",
+      gate_answers(answer) == [("person", "gate-1", "changes")], answer.get("reports"))
 commit(run.repo, "export.txt", "export csv\n", "rename the button")
 answer = run.next()
 check("after the fix, an earlier step whose proof went stale runs again before the gate",
@@ -332,18 +362,18 @@ answer = run.done(requested("gate-2", wrapped=False))
 check("a second request parks on the new gate", answer["action"] == "parked" and answer["gate"]["id"] == "gate-2", answer)
 answer = run.next(gateAnswer={"id": "gate-2", "status": "approved", "answeredBy": "pat"})
 check("an approval moves the run on to the next step", answer["action"] == "run" and answer["step"]["id"] == "review", answer)
-check("an approval is recorded done and reported by no one but the tracker",
-      gate_reports(answer) == [] and run.state()["steps"]["approve"]["status"] == "done"
+check("an approval is recorded done, and journaled as the person's answer to that gate",
+      gate_answers(answer) == [("person", "gate-2", "approved")] and run.state()["steps"]["approve"]["status"] == "done"
       and run.state()["steps"]["approve"]["verdict"] == "APPROVAL: APPROVED", run.state()["steps"]["approve"])
 while run.answer["action"] == "run":
     run.done()
 check("the approved run finishes", run.answer["action"] == "finished" and run.answer["outcome"] == "completed", run.answer)
-_, said, _, _ = run.call("reported", {"item": "I123", "ok": False})
-_, unsent, _, err = run.call("unsent", {"cwd": run.repo})
-replayed = [r for runs in (unsent or {}).get("runs", []) for call in runs["reports"] for r in call.get("reports", [])]
-check("a replay of its unsent reports never says the approval was done: the tracker writes a gate's end, never an agent",
-      bool(replayed) and [r for r in replayed if r.get("stepId") == "approve" and r.get("status") in ("done", "failed")] == []
-      and (unsent["runs"][0]["reports"][-1].get("run") or {}).get("outcome") == "completed", (said, unsent, err))
+whole = [e for box in TOLD[0].outboxes(run.cache).values() for e in box["events"]]
+ended = [e for e in whole if e.get("stepId") == "approve" and e["type"] == "step-answered" and e["payload"].get("status") in ("done", "failed")]
+check("the run's whole history never says an agent approved: each end of the gate step is a person's answer to a named gate",
+      [(e["actor"], e["payload"]["gate"]["id"], e["payload"]["gate"]["status"]) for e in ended]
+      == [("person", "gate-1", "changes"), ("person", "gate-2", "approved")]
+      and whole[-1]["type"] == "run-finished" and whole[-1]["payload"]["trackerOutcome"] == "completed", (ended, whole[-1]))
 
 # --- rejected, unavailable, a request with no gate --------------------------------------------
 rejected = Driver()
@@ -366,8 +396,8 @@ answer = nameless.done("APPROVAL: REQUESTED\n```json\n{\"status\": \"pending\"}\
 check("a request whose answer names no gate stops the run rather than waiting on nothing",
       answer["action"] == "stopped" and answer["kind"] == "failed" and "names no gate" in answer["reason"], answer)
 
-check("an unavailable gate sends no failed report for the gate step (DevStride writes a gate's outcome), only the run's end",
-      gate_reports(answer, "failed") == [] and closes(answer, "failed"), answer.get("reports"))
+check("a gate that could not be asked is journaled failed as the agent's own answer, naming no person's decision, then the run's end",
+      len(gate_reports(answer, "failed")) == 1 and gate_answers(answer) == [] and closes(answer, "failed"), answer.get("reports"))
 
 # --- get_workflow_gate's own answer: { gateId, runId, stepId, attempt, kind, status, answer, note, answeredAt } -----
 def spec_gate(driver, gate_id, status, decision=None, note=None, wrapped=False):
@@ -384,8 +414,8 @@ for wrapped in (False, True):
     answer = spec.next(gateAnswer=spec_gate(spec, "gate-s", "pending", wrapped=wrapped))
     check("the tracker's pending gate (%s) is wait" % shape, answer["action"] == "parked" and "note" not in answer, answer)
     answer = spec.next(gateAnswer=spec_gate(spec, "gate-s", "answered", "approve", wrapped=wrapped))
-    check("the tracker's answered approve (%s) moves the run on, sending no gate report" % shape,
-          answer["action"] == "run" and answer["step"]["id"] == "review" and gate_reports(answer) == []
+    check("the tracker's answered approve (%s) moves the run on, journaled as the person's answer" % shape,
+          answer["action"] == "run" and answer["step"]["id"] == "review" and gate_answers(answer) == [("person", "gate-s", "approved")]
           and spec.state()["steps"]["approve"]["verdict"] == "APPROVAL: APPROVED", answer)
     spec = Driver()
     spec.to_gate()
@@ -399,14 +429,14 @@ for wrapped in (False, True):
     answer = spec.next(gateAnswer=spec_gate(spec, "gate-j", "answered", "reject", "Not now", wrapped=wrapped))
     check("the tracker's answered reject (%s) stops the run with APPROVAL: REJECTED" % shape,
           answer["action"] == "stopped" and answer["kind"] == "failed" and answer["reason"].startswith("APPROVAL: REJECTED")
-          and gate_reports(answer) == [] and closes(answer, "failed"), answer)
+          and gate_answers(answer) == [("person", "gate-j", "rejected")] and closes(answer, "failed"), answer)
     spec = Driver()
     spec.to_gate()
     spec.done(requested("gate-w"))
     answer = spec.next(gateAnswer=spec_gate(spec, "gate-w", "withdrawn", wrapped=wrapped))
     check("the tracker's withdrawn gate (%s) ends the run interrupted, saying why, and never goes on" % shape,
           answer["action"] == "finished" and answer["outcome"] == "interrupted" and "withdrawn" in answer["note"]
-          and gate_reports(answer) == [] and closes(answer, "interrupted")
+          and gate_answers(answer) == [("person", "gate-w", "withdrawn")] and closes(answer, "interrupted")
           and spec.call("next", {"item": "I123"})[1]["action"] == "finished", answer)
     spec = Driver()
     spec.to_gate()
@@ -528,8 +558,8 @@ check("status names the checkpoint the run waits at", status["parkedAt"] == {"id
 answer = cp.next(gateAnswer=marked(cp, "cp-1", "approve"))
 check("an approval is not an answer to a checkpoint: still waiting", answer["action"] == "parked", answer)
 answer = cp.next(gateAnswer={"data": marked(cp, "cp-1", "done")})
-check("done moves the run on to the review, and the runner sends no report for the person's answer",
-      answer["action"] == "run" and answer["step"]["id"] == "review" and checkpoint_reports(answer) == []
+check("done moves the run on to the review, journaled as the person's answer to that checkpoint",
+      answer["action"] == "run" and answer["step"]["id"] == "review" and gate_answers(answer, "by-hand") == [("person", "cp-1", "done")]
       and cp.state()["steps"]["by-hand"]["verdict"] == "CHECKPOINT: DONE", answer)
 while cp.answer["action"] == "run":
     cp.done()

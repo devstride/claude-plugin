@@ -1,0 +1,207 @@
+{
+ "_readme": "Three runs of the step runner, written once and read by two sides: scripts/tests/run_scenarios.py drives them through skills/run-workflow/scripts/workflow.py and prints the history each run sent, and whatever shows that history to a person is checked against the runner's own status for the same run. Each command is one call of the runner, one second after the last. A `done` names the step the run must be at; its answer is `output` when given, else the passing answer for the step's contract in workflow-fixtures.json or in `outputs` here. {head}, {tree} and {patchId} stand for the scenario repository's own values.",
+ "session": "scenario-session",
+ "machine": "scenario-machine",
+ "remote": "https://example.com/acme/app.git",
+ "outputs": {
+  "merged-release@1": "MERGED RELEASE: FOUND 123\n```json\n{\"sha\": \"0f0e0d0c0b0a09080706050403020100ffeeddcc\", \"pullRequest\": 123}\n```\n",
+  "deploy-confirm@1": "DEPLOY: CONFIRMED 0f0e0d0c0b0a09080706050403020100ffeeddcc\n```json\n{\"mergeCommit\": \"0f0e0d0c0b0a09080706050403020100ffeeddcc\", \"confirmedAt\": \"2026-01-02T03:00:00.000Z\"}\n```\n",
+  "post-deploy-check-owed@1": "POST-DEPLOY HEALTH: PASS\nalarms: none\n```json\n{\"state\": \"pass\"}\n```\n",
+  "post-deploy-result@1": "POST-DEPLOY STATUS: SUCCESS POSTED\n```json\n{\"state\": \"success\"}\n```\n"
+ },
+ "scenarios": [
+  {
+   "name": "build-to-the-end",
+   "workflow": "build.json",
+   "context": {
+    "item": "I123",
+    "goal": "Add the export button",
+    "profile": {
+     "name": "extended",
+     "source": "config"
+    },
+    "workingBase": "main",
+    "oneOff": false,
+    "route": "epic-release",
+    "releaseUnit": "I120",
+    "reviewMoment": "release-deferred",
+    "branchSlug": "export-button",
+    "mode": "named"
+   },
+   "commands": [
+    {
+     "command": "start",
+     "expect": "run"
+    },
+    {
+     "command": "done",
+     "step": "claim"
+    },
+    {
+     "command": "done",
+     "step": "start"
+    },
+    {
+     "command": "done",
+     "step": "branch"
+    },
+    {
+     "command": "done",
+     "step": "build"
+    },
+    {
+     "command": "done",
+     "step": "risk-check"
+    },
+    {
+     "command": "done",
+     "step": "local-checks"
+    },
+    {
+     "command": "done",
+     "step": "review"
+    },
+    {
+     "command": "done",
+     "step": "merge"
+    },
+    {
+     "command": "done",
+     "step": "complete"
+    },
+    {
+     "command": "done",
+     "step": "capture"
+    },
+    {
+     "command": "done",
+     "step": "sync",
+     "expect": "finished"
+    }
+   ]
+  },
+  {
+   "name": "stop-and-resume",
+   "workflow": "build.json",
+   "context": {
+    "item": "I123",
+    "goal": "Add the export button",
+    "profile": {
+     "name": "extended",
+     "source": "config"
+    },
+    "workingBase": "main",
+    "oneOff": false,
+    "route": "epic-release",
+    "releaseUnit": "I120",
+    "reviewMoment": "release-deferred",
+    "branchSlug": "export-button",
+    "mode": "named"
+   },
+   "commands": [
+    {
+     "command": "start",
+     "expect": "run"
+    },
+    {
+     "command": "done",
+     "step": "claim"
+    },
+    {
+     "command": "done",
+     "step": "start"
+    },
+    {
+     "command": "done",
+     "step": "branch"
+    },
+    {
+     "command": "done",
+     "step": "build",
+     "output": "BUILD: BLOCKED the export tests fail\n2 of 12 tests fail\n",
+     "expect": "stopped"
+    },
+    {
+     "command": "resume",
+     "request": {},
+     "expect": "run"
+    },
+    {
+     "command": "done",
+     "step": "build"
+    },
+    {
+     "command": "done",
+     "step": "risk-check"
+    },
+    {
+     "command": "done",
+     "step": "local-checks"
+    },
+    {
+     "command": "done",
+     "step": "review"
+    },
+    {
+     "command": "done",
+     "step": "merge"
+    },
+    {
+     "command": "done",
+     "step": "complete"
+    },
+    {
+     "command": "done",
+     "step": "capture"
+    },
+    {
+     "command": "done",
+     "step": "sync",
+     "expect": "finished"
+    }
+   ]
+  },
+  {
+   "name": "rewind",
+   "workflow": "release-post-deploy.json",
+   "context": {
+    "productionBranch": "main",
+    "scope": "post-deploy",
+    "startedBy": "person"
+   },
+   "commands": [
+    {
+     "command": "start",
+     "expect": "run"
+    },
+    {
+     "command": "done",
+     "step": "merged-release"
+    },
+    {
+     "command": "done",
+     "step": "confirm-deploy"
+    },
+    {
+     "command": "done",
+     "step": "post-deploy-check"
+    },
+    {
+     "command": "done",
+     "step": "post-deploy-status",
+     "output": "POST-DEPLOY STATUS: RECHECK\n```json\n{\"state\": \"recheck\"}\n```\n",
+     "expect": "run"
+    },
+    {
+     "command": "done",
+     "step": "post-deploy-check"
+    },
+    {
+     "command": "done",
+     "step": "post-deploy-status",
+     "expect": "finished"
+    }
+   ]
+  }
+ ]
+}

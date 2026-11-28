@@ -9,6 +9,11 @@ set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 FAIL=0; ok() { echo "  ok   $1"; }; bad() { echo "  FAIL $1"; FAIL=1; }
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
+# The step runner sends a run's history itself, with this machine's own DevStride key. No test may
+# find one: each runs with a home folder of its own, no key in its environment, and the one
+# address a call could go to set to a port of this machine that nothing listens on.
+export HOME="$WORK/home" XDG_CONFIG_HOME="$WORK/home/.config" DEVSTRIDE_PLUGIN_TEST_URL="http://127.0.0.1:9"; mkdir -p "$HOME"
+unset CLAUDE_CONFIG_DIR DEVSTRIDE_API_KEY DEVSTRIDE_API_SECRET DEVSTRIDE_ORG_ID DEVSTRIDE_ORG_SLUG DEVSTRIDE_BASE_URL
 export PYTHONDONTWRITEBYTECODE=1
 unset CLAUDE_CODE_SESSION_ID CODEX_THREAD_ID XDG_CACHE_HOME GIT_DIR GIT_WORK_TREE
 
@@ -43,6 +48,19 @@ def load(root=ROOT):
     return module
 
 
+def load_driver():
+    """The scenario driver: the stand-in tracker, the scripted World, the schema check and the outbox reader."""
+    spec = importlib.util.spec_from_file_location("run_scenarios", os.path.join(ROOT, "scripts/tests/run_scenarios.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+SC, SEEN = load_driver(), {}
+SCHEMA = SC.read_json(SC.SCHEMA)
+HISTORY_LINE = "This run's history is not reaching DevStride yet; the run carries on, and the history is sent once DevStride can be reached."
+
+
 def stand_in_catalog():
     catalog = copy.deepcopy(REAL_CATALOG)
     catalog["contracts"].update(copy.deepcopy(FIX["catalogs"]["standIn"]["contracts"]))
@@ -60,7 +78,8 @@ def plugin_copy(name, catalog=None):
         os.makedirs(os.path.join(root, folder))
     shutil.copy(os.path.join(ROOT, ".claude-plugin/plugin.json"), os.path.join(root, ".claude-plugin/plugin.json"))
     for path in (RUNNER, "skills/build-item/scripts/workflow_report.py", "skills/build-item/scripts/claim_record.py",
-                 "skills/build-item/scripts/session_stop.py", "skills/build-item/scripts/portable.py"):
+                 "skills/build-item/scripts/devstride_connection.py", "skills/build-item/scripts/session_stop.py",
+                 "skills/build-item/scripts/portable.py", "skills/build-item/scripts/reporter_credential.py"):
         shutil.copy(os.path.join(ROOT, path), os.path.join(root, path))
     with open(os.path.join(root, "schemas/step-contracts.json"), "w", encoding="utf-8") as out:
         json.dump(catalog or REAL_CATALOG, out)
@@ -112,9 +131,19 @@ def fresh(name):
     return path
 
 
-def cli(root, command, request, cache, cwd=None, session="s1", raw=None):
-    """Run one command. Returns (exit code, the answer or None, stdout, stderr)."""
+def cli(root, command, request, cache, cwd=None, session="s1", raw=None, env=None):
+    """Run one command. Returns (exit code, the answer or None, stdout, stderr).
+
+    The runner hands out no step reports: it journals one event a transition and sends them itself.
+    Here there is no DevStride to send to (this file's first lines see to that), so every event stays
+    in the run's outbox, and `reports` on an answer below is NOT the runner's: it is what that one
+    command journaled (absent when it journaled nothing), read from the outboxes and laid out one run
+    at a time as a person is shown it
+    (run_scenarios.py `journaled`): {runId, sessionId, itemNumber?, repository?, definition?, events,
+    reports: [a row for each event that changes a step], run?: {outcome, endedAt}}."""
+    extra = env or {}
     env = dict((k, v) for k, v in os.environ.items() if k not in ("CLAUDE_CODE_SESSION_ID", "CODEX_THREAD_ID"))
+    env.update(extra)
     env["XDG_CACHE_HOME"] = cache
     if raw is None:
         request = dict(request)
@@ -125,6 +154,12 @@ def cli(root, command, request, cache, cwd=None, session="s1", raw=None):
     answer = None
     if done.returncode == 0:
         answer = json.loads(done.stdout)
+        if isinstance(answer, dict):
+            if "reports" in answer:
+                raise AssertionError("the runner handed out step reports: %s" % done.stdout[:300])
+            told = SC.journaled(cache, SEEN)
+            if told:
+                answer["reports"] = told
     return done.returncode, answer, done.stdout, done.stderr
 
 
@@ -566,7 +601,7 @@ def section_lifecycle():
     check("the reports name the run, the session and the item", reports[0]["runId"] == first["runId"] and reports[0]["sessionId"] == "s1" and reports[0]["itemNumber"] == "I123" and "repository" not in reports[0], reports[0])
     again = run.next()
     check("asking twice returns the same step and attempt", is_run(again, "claim", 1) and again["payload"] == first["payload"], again)
-    check("a later report carries no definition", all("definition" not in call for call in again["reports"]), again["reports"])
+    check("asking again journals nothing: a step handed back is no new event", "reports" not in again, again.get("reports"))
     seen, order = {}, []
     while run.answer["action"] == "run":
         answer = run.answer
@@ -640,23 +675,28 @@ def section_lifecycle():
                  and all(r["ran"] == {"source": "builtin", "ref": refs[step_id], "version": version, "hash": digest(refs[step_id])} for r in by_step[step_id])
                  for step_id in wanted)
     check("every step has a running and a finished report naming the skill, the version and the hash of its text", shaped, by_step.get("claim"))
-    check("no report object holds more than four step reports", all(len(call.get("reports", [])) <= 4 for answer in run.answers for call in answer["reports"]))
+    journal = history(run.cache, first["runId"])
+    faults = [fault for event in journal for fault in SC.schema_faults(event, SCHEMA)]
+    check("the run journaled one event a transition, numbered from 1 with no hole, each one the schema allows",
+          [event["clientSequence"] for event in journal] == list(range(1, 25)) and not faults
+          and [event["type"] for event in journal] == ["run-started"] + ["step-issued", "step-answered"] * 11 + ["run-finished"], faults[:3])
     merge_done = [r for r in by_step["merge"] if r["status"] == "done"][0]
     check("a finished report carries the verdict, the evidence and the links",
           merge_done["verdict"] == "MERGE: LANDED main" and merge_done["links"] == {"commit": "https://example.com/commit/1"}
           and [r for r in by_step["build"] if r["status"] == "done"][0]["evidence"] == ["3 files changed", "12 tests pass"], merge_done)
     rc, status, _, _ = run.call("status", {"item": "I123"})
     check("status lists every step, with a ready table",
-          rc == 0 and status["state"] == "finished" and status["position"] is None and len(status["rows"]) == 11 and status["reports"] == []
+          rc == 0 and status["state"] == "finished" and status["position"] is None and len(status["rows"]) == 11 and "reports" not in status
+          and status["history"] == {"events": 24, "unsent": 24, "stopped": None, "off": False}
           and status["rows"][0] == {"stepId": "claim", "phase": "Pick up", "name": "Claim it", "status": "done", "verdict": "CLAIM: WON", "attempt": 1}
           and len(status["table"].split("\n")) == 13 and status["table"].startswith("| Phase | Step | Status | Verdict | Attempt |\n|---|"), status)
-    before = open(run.state_path()).read()
-    rc, status, _, _ = run.call("status", {"item": "I123", "includeDefinition": True})
-    check("status with includeDefinition returns the definition once, and changes nothing",
-          len(status["reports"]) == 1 and status["reports"][0]["definition"] == FIX["definitions"]["build"] and "reports" not in status["reports"][0]
-          and open(run.state_path()).read() == before, status["reports"])
+    box = run.state_path()[:-len(".json")] + ".outbox.json"
+    before = (open(run.state_path()).read(), open(box).read())
+    rc, status, _, _ = run.call("status", {"item": "I123", "evidence": True})
+    check("status changes nothing: neither the run's state nor its unsent history",
+          rc == 0 and (open(run.state_path()).read(), open(box).read()) == before and "definition" not in status, sorted(status))
     check("a finished run takes no more answers", refused(run.call("done", {"item": "I123", "stepId": "sync", "attempt": 1, "output": "SYNC: CLEAN"}), "not-current-step"))
-    check("a finished run stays finished", run.next()["action"] == "finished" and run.answer["reports"] == [])
+    check("a finished run stays finished", run.next()["action"] == "finished" and "reports" not in run.answer)
 
     # a renamed step keeps its contract
     run = Driver(edits=[{"op": "set", "step": "review", "path": ["id"], "value": "second-opinion"}])
@@ -703,8 +743,7 @@ def section_lifecycle():
     check("NEEDS DECISION stops the run for a person, with a waiting report, and leaves the run open",
           is_stopped(answer, "needs-person", "build") and answer["reason"] == "keep the old export format?" and report["status"] == "waiting"
           and not ends_run(answer) and answer["recorded"]["status"] == "waiting", answer)
-    check("a question's waiting report says a person is asked", report.get("waitingOn") == "person", report)
-    check("a stopped run stays stopped until it is resumed", is_stopped(run.next(), "needs-person") and run.answer["reports"] == [])
+    check("a stopped run stays stopped until it is resumed", is_stopped(run.next(), "needs-person") and "reports" not in run.answer)
     rc, answer, _, _ = run.call("resume", {"item": "I123", "answer": "yes, keep it"})
     check("resume with an answer re-issues the step with the answer in its payload, and ends nothing",
           is_run(answer, "build", 2) and answer["payload"]["answer"] == "yes, keep it" and not ends_run(answer), answer)
@@ -713,22 +752,21 @@ def section_lifecycle():
     check("the answer is handed out for that attempt only", is_run(answer, "risk-check", 1) and run.state()["steps"]["build"]["answer"] is None, answer)
     check("an answer that is not text is refused", refused(run.call("resume", {"item": "I123", "answer": 7}), "bad-request"))
 
-    # A run waiting for a person whose reports did not arrive is replayed open, never ended.
+    # A run waiting for a person stays open in its history: the step waits, the run is not ended.
     run = Driver()
     run.until("build")
-    run.done("BUILD: NEEDS DECISION keep the old export format?\n")
-    run.call("reported", {"item": "I123", "ok": False})
-    unsent = run.call("unsent", {"cwd": run.cwd}, session="another-session")[1]
-    replayed = [call for listed in unsent["runs"] for call in listed["reports"]]
+    parked = run.done("BUILD: NEEDS DECISION keep the old export format?\n")
+    waiting = history(run.cache, parked["runId"])
     # Resuming from another folder of the same checkout finds the run: its own session by the
     # session, another session by the run's recorded repository, never by the current folder.
     deeper = os.path.join(run.cwd, "docs", "inner")
     os.makedirs(deeper)
     rc, mine, _, err = cli(run.root, "resume", {"item": "I123", "workflow": "build", "answer": "yes", "cwd": deeper}, run.cache, cwd=deeper)
     check("resume from a folder deeper in the same checkout finds this session's run", rc == 0 and is_run(mine, "build", 2), (rc, err))
-    check("a replayed run waiting for a person says its waiting step and does not end the run",
-          len(unsent["runs"]) == 1 and replayed and not any("run" in call for call in replayed)
-          and [r["status"] for call in replayed for r in call["reports"] if r["stepId"] == "build"][-1] == "waiting", unsent)
+    check("the history of a run waiting for a person says its waiting step and does not end the run",
+          not ends_run(parked) and [r["status"] for r in run.step_reports([parked]) if r["stepId"] == "build"][-1] == "waiting"
+          and (waiting[-1]["type"], waiting[-1]["payload"]["kind"], waiting[-1]["payload"].get("trackerOutcome")) == ("run-stopped", "needs-person", None)
+          and SC.run_ending(waiting) is None, waiting[-1])
 
     # FAIL and BLOCKED stop
     run = Driver()
@@ -1178,6 +1216,15 @@ def section_evidence():
     check("a question that holds a secret marker is withheld too", answer["reason"] == "[withheld]" and "abc123def" not in json.dumps(answer) + open(run.state_path()).read(), answer)
     run, answer, text, report = claim('CLAIM: WON\n```json\n{"state": "won", "padding": "%s"}\n```\n' % ("p" * 17000))
     check("a result over 16 KB is refused", is_stopped(answer, "failed", "claim") and "16 KB" in answer["reason"] and run.state()["steps"]["claim"]["result"] == {}, answer)
+    # An event trimmed to the 32 KB limit still fits once the names of what was left out are added.
+    module = load()
+    limit = module.EVENT_PAYLOAD_MAX_BYTES
+    base = {"verdictLine": "CLAIM: WON", "status": "done", "proof": {"head": "a" * 60}, "evidence": ["e" * 900] * 4}
+    room = limit - module.event_bytes(dict(base, links={"other": ""}))
+    # Fifty bytes over: leaving the proof out brings the payload under the limit by less than its own name in `leftOut` adds back.
+    fitted = module.fit_event({"type": "step-answered", "payload": dict(base, links={"other": "x" * (room + 50)})})["payload"]
+    check("an event trimmed to its size limit fits with the list of what was left out",
+          module.event_bytes(fitted) <= limit and fitted.get("leftOut") == ["proof", "evidence"], (module.event_bytes(fitted), fitted.get("leftOut")))
     run, answer, text, report = claim('CLAIM: WON\n```json\n{"state": "won", "heldBy": 7, "holderToken": "tok-123", "since": "today"}\n```\nand the transcript went on: tail-text\n')
     check("an unknown result key, and an optional one of the wrong type, are dropped", run.state()["steps"]["claim"]["result"] == {"state": "won", "since": "today"} and "tok-123" not in text, run.state()["steps"]["claim"]["result"])
     check("nothing after the result block is kept", "tail-text" not in text)
@@ -1256,11 +1303,12 @@ def section_state():
     run = Driver(definition="claim-only", plain=True)
     folder = os.path.dirname(run.state_path())
     check("the state file is owner-only, in an owner-only folder",
-          stat.S_IMODE(os.stat(run.state_path()).st_mode) == 0o600 and stat.S_IMODE(os.stat(folder).st_mode) == 0o700 and os.listdir(folder) == ["s1.I123.json"], os.listdir(folder))
+          stat.S_IMODE(os.stat(run.state_path()).st_mode) == 0o600 and stat.S_IMODE(os.stat(folder).st_mode) == 0o700 and sorted(os.listdir(folder)) == ["s1.I123.json", "s1.I123.outbox.json"]
+          and stat.S_IMODE(os.stat(os.path.join(folder, "s1.I123.outbox.json")).st_mode) == 0o600, os.listdir(folder))
     state = run.state()
     check("the state file holds the run as specified",
           state["stateVersion"] == 1 and state["sessionId"] == "s1" and state["item"] == "I123" and state["outcome"] is None and state["endedAt"] is None
-          and state["current"] == {"stepId": "claim", "attempt": 1} and state["stopped"] is None and state["definitionReported"] is True
+          and state["current"] == {"stepId": "claim", "attempt": 1} and state["stopped"] is None and "definitionReported" not in state and state["eventSeq"] == 2
           and state["context"]["repository"] is None and state["context"]["cwd"] == os.path.realpath(run.cwd) and state["seq"] == 1
           and state["steps"]["claim"]["status"] == "issued" and state["pluginVersion"] == json.load(open(os.path.join(ROOT, ".claude-plugin/plugin.json")))["version"], state)
     world = module.World(env={}, uid=os.getuid())
@@ -1320,9 +1368,12 @@ def section_state():
     adopted = run.state("s2")
     check("resume adopts the unfinished run an earlier session left: same run, same step, new session",
           rc == 0 and is_run(answer, "claim", 1) and answer["runId"] == first["runId"] and adopted["sessionId"] == "s2"
-          and not os.path.exists(run.state_path("s1")) and os.listdir(os.path.dirname(run.state_path())) == ["s2.I123.json"], err)
-    check("the first report after an adoption carries the definition again and the new session",
-          answer["reports"][0]["definition"] == FIX["definitions"]["claim-only"] and answer["reports"][0]["sessionId"] == "s2", answer["reports"])
+          and not os.path.exists(run.state_path("s1")) and sorted(os.listdir(os.path.dirname(run.state_path()))) == ["s2.I123.json", "s2.I123.outbox.json"], err)
+    moved = SC.outboxes(run.cache)["s2.I123.outbox.json"]
+    check("the unsent history of an adopted run moves with it: under the new session, from its first event, still with the definition",
+          moved["sessionId"] == "s2" and moved["definition"] == FIX["definitions"]["claim-only"] and answer["reports"][0]["sessionId"] == "s2"
+          and [event["type"] for event in moved["events"]] == ["run-started", "step-issued", "run-adopted", "run-resumed"]
+          and (moved["events"][2]["payload"]["fromSessionId"], moved["events"][2]["payload"]["toSessionId"]) == ("s1", "s2"), moved["events"][2])
     check("the old session no longer has the run", refused(run.call("next", {"item": "I123"}, session="s1"), "no-run"))
     run.session = "s2"
     run.answer = answer
@@ -1373,7 +1424,7 @@ def section_state():
     cache = fresh("cache")
     env = dict(os.environ, XDG_CACHE_HOME=cache, CODEX_THREAD_ID="thread-7")
     done = subprocess.run([sys.executable, "-B", os.path.join(roots("fixture"), RUNNER), "start"], input=json.dumps(request), capture_output=True, text=True, env=env, cwd=repo)
-    check("without a session in the request the agent's own session id is used", done.returncode == 0 and os.listdir(os.path.join(cache, "devstride-plugin", "workflows")) == ["thread-7.I123.json"], done.stderr)
+    check("without a session in the request the agent's own session id is used", done.returncode == 0 and state_files(os.path.join(cache, "devstride-plugin", "workflows")) == ["thread-7.I123.json"], done.stderr)
     env["CLAUDE_CODE_SESSION_ID"] = "claude-9"
     done = subprocess.run([sys.executable, "-B", os.path.join(roots("fixture"), RUNNER), "start"], input=json.dumps(request), capture_output=True, text=True, env=env, cwd=repo)
     check("... the first of the two the claim helper reads", done.returncode == 0 and "claude-9.I123.json" in os.listdir(os.path.join(cache, "devstride-plugin", "workflows")), done.stderr)
@@ -1389,71 +1440,498 @@ def section_reporting():
           == hashlib.sha256(module.REPORT.canonical_json(run.answer["reports"][0]["definition"])).hexdigest(), run.answer["definitionHash"])
     run = Driver(definition="mostly-off", plain=True)
     calls = run.answer["reports"]
-    check("six step reports from one command go out as four and two, the definition in the first only",
-          [len(call["reports"]) for call in calls] == [4, 2] and "definition" in calls[0] and "definition" not in calls[1]
-          and [r["status"] for call in calls for r in call["reports"]] == ["skipped"] * 5 + ["running"]
-          and calls[0]["reports"][0]["ran"] == {"source": "off"}, calls)
+    check("one command that switches five steps off journals them all for one send, the definition with the run's first event",
+          len(calls) == 1 and calls[0]["definition"] == FIX["definitions"]["mostly-off"]
+          and [event["type"] for event in calls[0]["events"]] == ["run-started"] + ["step-decided"] * 5 + ["step-issued"]
+          and [r["status"] for r in calls[0]["reports"]] == ["skipped"] * 5 + ["running"]
+          and calls[0]["reports"][0]["ran"] == {"source": "off"} and calls[0]["events"][1]["payload"]["decision"] == "off"
+          and [event["actor"] for event in calls[0]["events"]] == ["agent"] + ["script"] * 5 + ["agent"], calls)
     final = run.done()
-    check("a report object is exactly what the reporting helper builds",
-          final["reports"] == [module.REPORT.build_report_arguments(final["runId"], "s1", [dict(final["reports"][0]["reports"][0], step="claim")], item_number="I123",
-                                                                  run=final["reports"][0]["run"])], final["reports"])
+    journal = history(run.cache, final["runId"])
+    faults = [fault for event in journal for fault in SC.schema_faults(event, SCHEMA)]
+    check("every event of the run is one the schema allows, and the last one ends it as the run table names it",
+          not faults and [event["clientSequence"] for event in journal] == list(range(1, len(journal) + 1))
+          and (journal[-1]["type"], journal[-1]["payload"]["outcome"], journal[-1]["payload"]["trackerOutcome"]) == ("run-finished", "completed", "completed")
+          and final["reports"][-1]["run"] == {"outcome": "completed", "endedAt": journal[-1]["occurredAt"]}, faults[:3])
+    check("the runner hands out no step reports and has no command that takes what became of one",
+          "reported" not in module.COMMANDS and "unsent" not in module.COMMANDS and not hasattr(module, "replay_reports")
+          and all(refused(run.call(command, {"item": "I123", "ok": True}), "bad-request") for command in ("reported", "unsent")))
     check("the runner keeps no second copy of the helper's rules",
           not re.search(r"def (canonical_json|definition_hash|normalize_repository|clean_verdict|clean_evidence|clean_links|build_report_arguments)\b|sort_keys=True, separators=\(\",\", \":\"\), ensure_ascii=False|VERDICT_MAX|EVIDENCE_MAX",
                         open(os.path.join(ROOT, RUNNER)).read()))
 
 
-def section_records():
-    """What became of a run's reports, the replay of unsent ones, a repaired step's attempt and
-    the completeness check."""
-    run = Driver()
-    run.until("build")
-    first = run.call("reported", {"item": "I123", "ok": False})[1]
-    check("the first failed report marks the run and hands back the one line to say",
-          first["unsent"] is True and isinstance(first["say"], str) and "a later session" in first["say"]
-          and isinstance(run.state().get("reportsUnsent"), str), first)
-    again = run.call("reported", {"item": "I123", "ok": False})[1]
-    check("a second failed report says nothing more", again["unsent"] is True and again["say"] is None, again)
-    check("reported needs ok to be true or false", refused(run.call("reported", {"item": "I123"}), "bad-request"))
-    check("reported for an unknown run id is refused", refused(run.call("reported", {"runId": "0" * 32, "ok": True}), "no-run"))
-    live = run.call("unsent", {"cwd": run.cwd}, session="another-session")[1]
-    check("a run still going is never handed to another session", live == {"runs": [], "more": 0}, live)
-    stopped = run.done("BUILD: BLOCKED the tests cannot be made to pass\n")
-    unsent = run.call("unsent", {"cwd": run.cwd}, session="another-session")[1]
-    reports = [r for call in unsent["runs"][0]["reports"] for r in call["reports"]] if unsent["runs"] else []
-    check("once it has stopped, another session of the same repository is handed the run's reports in full",
-          is_stopped(stopped, "failed", "build") and len(unsent["runs"]) == 1 and unsent["more"] == 0
-          and unsent["runs"][0]["runId"] == stopped["runId"]
-          and [(r["stepId"], r["status"]) for r in reports] == [("claim", "done"), ("start", "done"), ("branch", "done"), ("build", "failed")]
-          and "definition" in unsent["runs"][0]["reports"][0] and all(len(call["reports"]) <= 4 for call in unsent["runs"][0]["reports"])
-          and unsent["runs"][0]["reports"][-1].get("run", {}).get("outcome") == "failed", unsent)
-    elsewhere = run.call("unsent", {"cwd": new_repo(remote="https://example.com/other/repo.git")}, session="another-session")[1]
-    check("a checkout of another repository is handed nothing", elsewhere == {"runs": [], "more": 0}, elsewhere)
-    before = run.state()["seq"]
-    run.call("unsent", {"cwd": run.cwd})
-    check("unsent changes nothing", run.state()["seq"] == before and run.state().get("reportsUnsent"))
-    before = run.state()["seq"]
-    kept = run.call("reported", {"runId": stopped["runId"], "ok": True}, session="another-session")[1]
-    check("... and that replay writes nothing to it", run.state()["seq"] == before)
-    check("a replayed run that has only stopped keeps its mark: its own session may carry it on unreported",
-          kept == {"runId": stopped["runId"], "unsent": True, "say": None} and run.state().get("reportsUnsent"), kept)
-    run.answer = run.call("resume", {"item": "I123"})[1]
-    run.to_end()
-    ended = run.call("unsent", {"cwd": run.cwd}, session="another-session")[1]["runs"][0]["reports"]
-    check("a finished run's replay ends with the run's own end",
-          ended[-1].get("run", {}).get("outcome") == "completed" and sum(len(call["reports"]) for call in ended) == 11
-          and ended[-1]["run"]["endedAt"] == run.state()["endedAt"]
-          and run.call("unsent", {"cwd": run.cwd, "now": "2030-01-01T00:00:00Z"})[1]["runs"][0]["reports"][-1]["run"]["endedAt"] == run.state()["endedAt"], ended)
-    cleared = run.call("reported", {"runId": stopped["runId"], "ok": True}, session="another-session")[1]
-    check("once the run has ended, a replay that went through clears the mark, from any session of this user",
-          cleared == {"runId": stopped["runId"], "unsent": False, "say": None} and "reportsUnsent" not in run.state()
-          and run.call("unsent", {"cwd": run.cwd})[1]["runs"] == [], cleared)
-    check("unsent refuses a cwd that is not a directory", refused(run.call("unsent", {"cwd": os.path.join(WORK, "no-such-folder")}), "bad-request"))
-    broken = dict(run.state(), reportsUnsent="2026-01-01T00:00:00Z")
-    del broken["sessionId"]
-    with open(os.path.join(os.path.dirname(run.state_path()), "x.I999.json"), "w") as out:
-        json.dump(broken, out)
-    check("a state file this runner did not write is skipped, never a failure", run.call("unsent", {"cwd": run.cwd})[1] == {"runs": [], "more": 0})
+def history(cache, run_id):
+    """Every event a run has journaled and not sent, in order."""
+    return [event for box in SC.outboxes(cache).values() if box["runId"] == run_id for event in box["events"]]
 
+
+def state_files(folder):
+    """The state files of a state folder: the outboxes beside them are not runs."""
+    return sorted(name for name in os.listdir(folder) if not name.endswith(".outbox.json"))
+
+
+class Sent:
+    """A run driven in this process whose one network call is answered by a stand-in tracker."""
+
+    def __init__(self, module, tracker=None, definition="build", environ=None, config=None, session="s1", cache=None, cwd=None, start=None, clock=0):
+        self.module, self.tracker = module, tracker if tracker is not None else SC.Tracker(SCHEMA, catalogs=[module.catalog_hash()])
+        self.cache = cache or fresh("cache")
+        self.repo = cwd or new_repo()
+        if config is not None:
+            os.makedirs(os.path.join(self.repo, ".claude"))
+            with open(os.path.join(self.repo, ".claude", "ds-config.json"), "w") as out:
+                json.dump(config, out)
+        self.world = SC.scripted_world(module, self.tracker, self.cache, environ=environ)
+        self.session, self.clock, self.said = session, clock, []
+        self.answer = self.call("start", dict({"definition": FIX["definitions"][definition], "context": dict(FIX["context"], cwd=self.repo)}, **(start or {})))
+        self.run_id = self.answer["runId"]
+
+    def call(self, command, request, after=1):
+        self.clock += after
+        answer = self.module.run_command(command, dict(request, session=self.session, now="2026-03-04T%02d:%02d:%02d.000Z" % (
+            self.clock // 3600, self.clock // 60 % 60, self.clock % 60)), self.world)
+        if answer.get("say"):
+            self.said.append(answer["say"])
+        return answer
+
+    def done(self, output=None, after=1):
+        step = self.answer["step"]
+        self.answer = self.call("done", {"item": "I123", "stepId": step["id"], "attempt": step["attempt"],
+                                         "output": output or canned(step["contract"], self.repo)}, after)
+        return self.answer
+
+    def to_end(self):
+        while self.answer["action"] == "run":
+            self.done()
+        return self.answer
+
+    def folder(self):
+        return os.path.join(self.cache, "devstride-plugin", "workflows")
+
+    def state(self):
+        with open(os.path.join(self.folder(), "%s.I123.json" % self.session)) as handle:
+            return json.load(handle)
+
+    def unsent(self):
+        return [event["clientSequence"] for event in history(self.cache, self.run_id)]
+
+    def held(self):
+        return [event["clientSequence"] for event in self.tracker.events(self.run_id)]
+
+    def records(self):
+        return [arguments for tool, arguments in self.tracker.calls if tool == SC.RECORD_TOOL]
+
+
+def section_history():
+    """The run's history: one event a transition, kept in an outbox beside the state and sent by the
+    runner itself; every way sending can go, none of which stops a step."""
+    module = load()
+    catalog = hashlib.sha256(SC.canonical(REAL_CATALOG)).hexdigest()
+    check("the catalog's hash is the hash of its canonical form, read without a command having run", module.catalog_hash() == catalog, module.catalog_hash())
+
+    # reached: a tracker that does not hold this plugin's step contracts yet
+    run = Sent(module, SC.Tracker(SCHEMA))
+    first = [(tool, sorted(arguments)) for tool, arguments in run.tracker.calls]
+    check("the first send meets a tracker with no catalog: the catalog goes up once, then the same batch again, with the definition",
+          first == [(SC.RECORD_TOOL, ["definition", "events", "itemNumber", "machine", "runId", "sessionId"]), (SC.CATALOG_TOOL, ["catalog", "pluginVersion"]),
+                    (SC.RECORD_TOOL, ["definition", "events", "itemNumber", "machine", "runId", "sessionId"])]
+          and run.tracker.calls[1][1]["catalog"] == REAL_CATALOG and run.tracker.calls[2][1]["definition"] == FIX["definitions"]["build"]
+          and run.held() == [1, 2] and run.unsent() == [] and "say" not in run.answer, first)
+    check("... and the catalog's hash on run-started is the hash the tracker gives the document it was sent",
+          run.tracker.events(run.run_id)[0]["payload"]["catalogHash"] == catalog and catalog in run.tracker.catalogs, catalog)
+    final = run.to_end()
+    events = run.tracker.events(run.run_id)
+    check("a Build run to the end sends every event in order, each command's as it happens, and leaves no outbox",
+          final["action"] == "finished" and run.held() == list(range(1, 25)) and not SC.outboxes(run.cache) and run.said == []
+          and [tool for tool, _ in run.tracker.calls].count(SC.CATALOG_TOOL) == 1 and run.tracker.refusals == [], (run.held(), run.said, run.tracker.refusals))
+    check("... the definition goes only with the batch that holds the run's first event, the machine and the item with every batch",
+          ["definition" in call for call in run.records()] == [True, True] + [False] * (len(run.records()) - 2)
+          and all(call["machine"] == "scenario-machine" and call["itemNumber"] == "I123" and call["sessionId"] == "s1" for call in run.records()))
+    opens = {}
+    for event in events:
+        opens.setdefault(event["payload"]["command"]["n"], event["clientSequence"])
+    check("... every event names its command, and what a command read is on its first event only",
+          all(opens[event["payload"]["command"]["n"]] == event["clientSequence"] for event in events if "observed" in event["payload"])
+          and [event["payload"]["command"]["name"] for event in events[:3]] == ["start", "start", "done"]
+          and any(event["payload"].get("observed", {}).get("head") for event in events), [e["payload"]["command"] for e in events][:4])
+    text = json.dumps([call["events"] for call in run.records()])
+    check("... and nothing sent names a folder of this machine: not the checkout, not the state folder",
+          run.repo not in text and run.cache not in text and os.path.realpath(run.repo) not in text and '"cwd"' not in text)
+    users = "/" + "Users"  # spelled in two parts: this file ships, and names no real home folder
+    homes = module.fit_event({"payload": {"result": {"receipt": users + "/jane/app/.git/devstride/verification/a1.json"},
+                                          "proof": {"receipt": "C:\\Users\\Jane Smith\\app\\r.json", "page": "https://example.com" + users + "/pat"},
+                                          "evidence": ["receipt at (/mnt/c" + users + "/Jane Smith/app/r.json)", "dir C:\\Users\\jane /b and 3/4 passed"]}})["payload"]
+    check("... and a path under a home folder is kept from ~ on, so no event names the machine's account; a web address is left alone",
+          homes == {"result": {"receipt": "~/app/.git/devstride/verification/a1.json"},
+                    "proof": {"receipt": "~\\app\\r.json", "page": "https://example.com" + users + "/pat"},
+                    "evidence": ["receipt at (~/app/r.json)", "dir ~ /b and 3/4 passed"]}, homes)
+    status = run.call("status", {"item": "I123"})
+    before = len(run.tracker.calls)
+    check("status says how much history the run has and how much is unsent, and sends nothing itself",
+          status["history"] == {"events": 24, "unsent": 0, "stopped": None, "off": False} and len(run.tracker.calls) == before and "reports" not in status, status["history"])
+
+    # one event a transition, by kind
+    run = Sent(module)
+    run.done()
+    run.done()
+    run.done()
+    waited = run.call("wait", {"item": "I123", "stepId": "build", "attempt": 1, "reason": "the tests are running"})
+    parked = run.done("BUILD: NEEDS DECISION keep the old export format?\n")
+    resumed = run.call("resume", {"item": "I123", "answer": "yes, keep it"})
+    run.answer = resumed
+    failed = run.done("BUILD: BLOCKED the tests cannot be made to pass\n")
+    run.answer = run.call("resume", {"item": "I123"})
+    kinds = [(event["type"], event.get("stepId"), event.get("attempt"), event["actor"]) for event in run.tracker.events(run.run_id)][7:]
+    check("a wait, a question for a person, the person's answer, a failed answer and a resume are each their own events, in order",
+          kinds == [("step-issued", "build", 1, "agent"), ("step-waiting", "build", 1, "agent"), ("step-answered", "build", 1, "agent"),
+                    ("run-stopped", None, None, "agent"), ("run-resumed", None, None, "person"), ("step-issued", "build", 2, "agent"),
+                    ("step-answered", "build", 2, "agent"), ("run-stopped", None, None, "agent"), ("run-resumed", None, None, "agent"),
+                    ("step-issued", "build", 3, "agent")], kinds)
+    by_kind = dict((event["clientSequence"], event["payload"]) for event in run.tracker.events(run.run_id))
+    stops = [event["payload"] for event in run.tracker.events(run.run_id) if event["type"] == "run-stopped"]
+    answers = [event["payload"] for event in run.tracker.events(run.run_id) if event["type"] == "run-resumed"]
+    check("... the wait carries its reason, the question leaves the run open, the failure ends it as failed, and the person's answer is kept",
+          by_kind[9]["reason"] == "the tests are running" and by_kind[10]["status"] == "waiting"
+          and (stops[0]["kind"], stops[0].get("trackerOutcome")) == ("needs-person", None) and (stops[1]["kind"], stops[1]["trackerOutcome"]) == ("failed", "failed")
+          and answers[0]["answer"] == "yes, keep it" and answers[1]["answer"] is None, (stops, answers))
+    check("... and the steps the events show are the steps the runner's own status shows",
+          [(row["stepId"], row["status"], row["attempt"]) for row in SC.step_reports(run.tracker.events(run.run_id)) if row["stepId"] == "build"]
+          == [("build", "waiting", 1), ("build", "failed", 2), ("build", "running", 3)]
+          and [row for row in run.call("status", {"item": "I123"})["rows"] if row["stepId"] == "build"][0]["attempt"] == 3)
+    secret = run.call("wait", {"item": "I123", "stepId": "build", "attempt": 3, "reason": "waiting on token ghp_" + "a1B2" * 9})
+    last = run.tracker.events(run.run_id)[-1]
+    check("a wait reason that looks like a credential is withheld from the history", last["type"] == "step-waiting" and "ghp_" not in json.dumps(last), last["payload"])
+
+    # a refusal writes nothing
+    held, state, calls = list(run.held()), open(os.path.join(run.folder(), "s1.I123.json")).read(), len(run.tracker.calls)
+    refusals = 0
+    for command, request in (("done", {"item": "I123", "stepId": "review", "attempt": 1, "output": "REVIEW: PASSED"}),
+                             ("done", {"item": "I123", "stepId": "build", "attempt": 9, "output": "BUILD: BUILT"}),
+                             ("wait", {"item": "I123", "stepId": "merge", "attempt": 1, "reason": "x"}), ("resume", {"item": "I999"}), ("next", {"item": "I999"})):
+        try:
+            run.call(command, request)
+        except module.Refuse:
+            refusals += 1
+    check("a refused command journals nothing, sends nothing and leaves the state as it was",
+          refusals == 5 and run.held() == held and run.unsent() == [] and len(run.tracker.calls) == calls
+          and open(os.path.join(run.folder(), "s1.I123.json")).read() == state, refusals)
+
+    # not reached, then reached: the outbox survives and drains in order
+    tracker = SC.Tracker(SCHEMA, catalogs=[catalog])
+    tracker.down = True
+    again = Sent(module, tracker)
+    check("a send that fails keeps the events in the outbox, says the one line, and the step is handed out all the same",
+          is_run(again.answer, "claim", 1) and again.answer["say"] == HISTORY_LINE and again.unsent() == [1, 2] and again.held() == []
+          and again.state()["sendAfter"] == "2026-03-04T00:01:01.000Z" and again.state()["historySaid"] is True, again.answer.get("say"))
+    mode = stat.S_IMODE(os.stat(os.path.join(again.folder(), "s1.I123.outbox.json")).st_mode)
+    check("the outbox is an owner-only file beside the state, and no temporary file is left", mode == 0o600 and sorted(os.listdir(again.folder())) == ["s1.I123.json", "s1.I123.outbox.json"], oct(mode))
+    tries = len(again.tracker.calls)
+    again.done()
+    again.done(after=58)
+    check("for the next 60 seconds nothing is sent and nothing more is said, while the outbox keeps growing in order",
+          len(again.tracker.calls) == tries and again.said == [HISTORY_LINE] and again.unsent() == [1, 2, 3, 4, 5, 6] and is_run(again.answer, "branch", 1), again.said)
+    again.done(after=1)
+    check("... and after them one more try is made, which fails again without a second line",
+          len(again.tracker.calls) == tries + 1 and again.said == [HISTORY_LINE] and again.state()["sendAfter"] == "2026-03-04T00:02:01.000Z", again.state().get("sendAfter"))
+    again.tracker.down = False
+    again.done(after=30)
+    check("a tracker that is back is not tried before the minute is up", again.held() == [] and len(again.unsent()) == 10)
+    again.done(after=31)
+    check("once it is, the whole outbox goes in order with the definition, the file is gone and the wait is over",
+          again.held() == list(range(1, 13)) and again.unsent() == [] and not SC.outboxes(again.cache) and "sendAfter" not in again.state()
+          and "definition" in again.records()[-1] and again.tracker.refusals == [], (again.held(), again.tracker.refusals))
+    again.to_end()
+    check("... and the run ends with its whole history held, having said its one line once", again.held() == list(range(1, 25)) and again.said == [HISTORY_LINE])
+
+    # an older server: no such tool
+    old = Sent(module, SC.Tracker(SCHEMA, tools=()), cwd=new_repo(remote="https://example.com/acme/app.git"))
+    old.to_end()
+    listed = old.call("status", {"all": True, "unsent": True})
+    check("an older DevStride with no such tool never stops a step: the run finishes, says its one line once, and keeps its history to send later",
+          old.answer["action"] == "finished" and old.said == [HISTORY_LINE] and old.unsent() == list(range(1, 25))
+          and old.tracker.refusals and all("Unknown tool" in reason for reason in old.tracker.refusals), old.said)
+    check("status for every run lists the history DevStride does not hold yet",
+          listed["unsent"] == [{"runId": old.run_id, "sessionId": "s1", "item": "I123", "events": 24, "since": "2026-03-04T00:00:01.000Z", "ended": True}], listed.get("unsent"))
+    # ... which a later run of the same checkout sends once DevStride is reached
+    later = Sent(module, SC.Tracker(SCHEMA, catalogs=[catalog]), cache=old.cache, cwd=old.repo, session="s2", clock=1000)
+    check("a later run that reaches DevStride sends the ended run's history too, from its first event, and its outbox goes",
+          [e["clientSequence"] for e in later.tracker.events(old.run_id)] == list(range(1, 25)) and later.tracker.events(old.run_id)[-1]["type"] == "run-finished"
+          and sorted(SC.outboxes(later.cache)) == [] and later.held() == [1, 2], sorted(SC.outboxes(later.cache)))
+
+    # history kept for one organization is never sent to another
+    home = SC.Tracker(SCHEMA, tools=())
+    home.org = "org-a"
+    kept = Sent(module, home, cwd=new_repo(remote="https://example.com/acme/app.git"))
+    kept.to_end()
+    other = SC.Tracker(SCHEMA, catalogs=[catalog])
+    other.org = "org-b"
+    elsewhere = Sent(module, other, cache=kept.cache, cwd=kept.repo, session="s2", clock=1000)
+    check("an ended run's history kept for one organization is not sent when the same checkout signs in to another",
+          other.events(kept.run_id) == [] and len(history(kept.cache, kept.run_id)) == 24 and elsewhere.held() == [1, 2]
+          and all(box["org"] == ("org-a" if box["runId"] == kept.run_id else "org-b") for box in SC.outboxes(kept.cache).values()), sorted(SC.outboxes(kept.cache)))
+    theirs = SC.Tracker(SCHEMA, catalogs=[catalog])
+    theirs.org = "org-b"
+    fetched = Sent(module, theirs, start={"fetched": {"match": None, "organizationId": "org-a"}})
+    fetched.done()
+    check("a run whose workflow was fetched from one organization sends no history under a key that signs in to another, from its first event on",
+          theirs.calls == [] and fetched.held() == [] and fetched.unsent() == [1, 2, 3, 4]
+          and all(box["org"] == "org-a" for box in SC.outboxes(fetched.cache).values()), (len(theirs.calls), fetched.unsent()))
+    wrapped = Sent(module, theirs, start={"fetched": {"data": {"match": None, "organizationId": "org-a"}}})
+    check("... the same when the fetch's answer came wrapped, as the route gives it", theirs.calls == [] and wrapped.unsent() == [1, 2])
+    theirs.org = "org-a"
+    fetched.done(after=120)
+    check("... and all of it once the key signs in to the organization the workflow came from", fetched.held() == [1, 2, 3, 4, 5, 6] and fetched.unsent() == [], fetched.held())
+    moved = SC.Tracker(SCHEMA, catalogs=[catalog])
+    moved.org, moved.down = "org-a", True
+    owned = Sent(module, moved)
+    tries = len(moved.calls)
+    moved.org, moved.down = "org-b", False
+    owned.done(after=120)
+    check("a run's own waiting history is not sent either, once its checkout signs in to another organization",
+          len(moved.calls) == tries and owned.held() == [] and owned.unsent() == [1, 2, 3, 4])
+    moved.org = "org-a"
+    owned.done(after=120)
+    check("... and is sent, in order, when it signs in to the first again", owned.held() == [1, 2, 3, 4, 5, 6] and owned.unsent() == [], owned.held())
+
+    # switched off while some history waits: what waits is not sent
+    quiet = SC.Tracker(SCHEMA, catalogs=[catalog])
+    quiet.down = True
+    late = Sent(module, quiet)
+    tries, quiet.down = len(quiet.calls), False
+    late.world = SC.scripted_world(module, quiet, late.cache, environ={"DEVSTRIDE_WORKFLOWS": "0"})
+    late.done(after=120)
+    status = late.call("status", {"item": "I123"})
+    check("history switched off while some of it waits: nothing more is kept and what waits is not sent, though DevStride is back",
+          len(quiet.calls) == tries and late.held() == [] and late.unsent() == [1, 2] and status["history"] == {"events": 2, "unsent": 2, "stopped": None, "off": True},
+          (len(quiet.calls), late.unsent(), status["history"]))
+    late.world = SC.scripted_world(module, quiet, late.cache)
+    late.done(after=1)
+    check("... and switched on again, what waited goes with what follows", late.held() == [1, 2, 3, 4] and late.unsent() == [], late.held())
+    below = Sent(module, config={"workflows": None})
+    os.makedirs(os.path.join(below.repo, "frontend"))
+    inner = Sent(module, cwd=os.path.join(below.repo, "frontend"))
+    check("the switch in the checkout's config is honoured by a run started in a folder below its top",
+          inner.tracker.calls == [] and not inner.state().get("eventSeq"), inner.tracker.calls[:1])
+
+    # out of order
+    class Behind(SC.Tracker):
+        """Holds events 1 and 2 already, and says so once the way the tracker names the event it expects."""
+        told = False
+
+        def call(self, tool, arguments):
+            if tool == SC.RECORD_TOOL and not self.told and arguments["events"][-1]["clientSequence"] >= 4:
+                self.told = True
+                self.calls.append((tool, copy.deepcopy(arguments)))
+                super().call(tool, dict(arguments, events=arguments["events"][:2]))
+                del self.calls[-1]
+                return {"outcome": "OUT_OF_ORDER", "expectedClientSequence": 3}
+            return super().call(tool, arguments)
+
+    tracker = Behind(SCHEMA, catalogs=[catalog])
+    tracker.down = True
+    behind = Sent(module, tracker)
+    tracker.down = False
+    behind.done(after=61)
+    sent = [[event["clientSequence"] for event in call["events"]] for call in behind.records()]
+    check("told the event DevStride expects, the runner drops what it already holds and sends again from that event",
+          behind.tracker.told and sent[-2:] == [[1, 2, 3, 4], [3, 4]] and behind.held() == [1, 2, 3, 4] and behind.unsent() == []
+          and behind.said == [HISTORY_LINE], sent)
+    gone = Sent(module, SC.Tracker(SCHEMA, catalogs=[catalog]))
+    gone.tracker.runs[gone.run_id]["events"] = gone.tracker.runs[gone.run_id]["events"][:1]  # DevStride lost what this machine no longer holds
+    gone.done()
+    check("when DevStride expects an event this machine no longer holds, the run's history stops with its own line and the run carries on",
+          is_run(gone.answer, "start", 1) and gone.answer["say"] == module.HISTORY_STOPPED["gap"] and gone.state()["historyStopped"] == "gap" and gone.unsent() == [], gone.answer.get("say"))
+    calls = len(gone.tracker.calls)
+    gone.to_end()
+    check("... and nothing more of it is sent or said", gone.answer["action"] == "finished" and len(gone.tracker.calls) == calls and gone.said == [module.HISTORY_STOPPED["gap"]])
+
+    # history full
+    full = Sent(module, SC.Tracker(SCHEMA, catalogs=[catalog], limit=4))
+    full.done()
+    full.done()
+    check("a run DevStride holds as much of as it keeps is told so once, in its own line, and the step is handed out",
+          is_run(full.answer, "branch", 1) and full.answer["say"] == module.HISTORY_STOPPED["history-full"] and full.held() == [1, 2, 3, 4]
+          and full.state()["historyStopped"] == "history-full" and not SC.outboxes(full.cache), full.answer.get("say"))
+    calls = len(full.tracker.calls)
+    full.to_end()
+    status = full.call("status", {"item": "I123"})
+    check("... after which the run sends no more, says no more and finishes",
+          full.answer["action"] == "finished" and len(full.tracker.calls) == calls and full.said == [module.HISTORY_STOPPED["history-full"]]
+          and status["history"]["stopped"] == "history-full" and status["history"]["unsent"] == 0, status["history"])
+
+    # a full outbox
+    limit = module.OUTBOX_MAX_BYTES
+    try:
+        small = Sent(module, SC.Tracker(SCHEMA, tools=()))
+        module.OUTBOX_MAX_BYTES = len(open(os.path.join(small.folder(), "s1.I123.outbox.json"), "rb").read()) + 2500
+        while small.answer["action"] == "run" and len(small.said) < 2:
+            small.done()
+        kept = small.unsent()
+        check("an outbox that has outgrown its size keeps what it holds, says its own line once, and the run carries on",
+              small.said == [HISTORY_LINE, module.HISTORY_STOPPED["outbox-full"]] and small.state()["historyStopped"] == "outbox-full"
+              and kept == list(range(1, len(kept) + 1)) and small.state()["eventSeq"] == len(kept), (small.said, kept))
+        small.done()
+        check("... no later event is kept or counted", small.answer["action"] == "run"
+              and small.unsent() == kept and small.state()["eventSeq"] == len(kept), small.unsent())
+        small.tracker.tools = (SC.RECORD_TOOL, SC.CATALOG_TOOL)
+        small.tracker.catalogs.add(catalog)
+        small.done(after=61)
+        check("... what it held still goes once DevStride is reached, and the run finishes having said its two lines once",
+              small.held() == kept and small.unsent() == [] and small.to_end()["action"] == "finished" and small.held() == kept and len(small.said) == 2,
+              (small.held(), small.tracker.refusals))
+    finally:
+        module.OUTBOX_MAX_BYTES = limit
+
+    # switched off
+    for label, environ, config in (("the machine variable DEVSTRIDE_WORKFLOWS=0", {"DEVSTRIDE_WORKFLOWS": "0"}, None), ("workflows set to null in the config", None, {"workflows": None})):
+        off = Sent(module, environ=environ, config=config)
+        off.to_end()
+        status = off.call("status", {"item": "I123"})
+        check("switched off by %s: nothing is kept, nothing is sent, nothing is said, and the run finishes" % label,
+              off.answer["action"] == "finished" and off.tracker.calls == [] and os.listdir(off.folder()) == ["s1.I123.json"] and off.said == []
+              and not off.state().get("eventSeq") and status["history"] == {"events": 0, "unsent": 0, "stopped": None, "off": True}, (off.tracker.calls[:1], os.listdir(off.folder())))
+    # switched off, then on: a run with no history yet opens it where it stands
+    carried = Sent(module, environ={"DEVSTRIDE_WORKFLOWS": "0"})
+    carried.done()
+    carried.world = SC.scripted_world(module, carried.tracker, carried.cache)
+    carried.done()
+    opened = carried.tracker.events(carried.run_id)
+    check("a run that kept no history until now opens it where it stands: run-started numbered 1, marked carried over, with the definition",
+          [event["type"] for event in opened] == ["run-started", "step-answered", "step-issued"] and opened[0]["payload"]["carriedOver"] is True
+          and opened[0]["clientSequence"] == 1 and "definition" in carried.records()[0] and carried.tracker.refusals == [], [e["type"] for e in opened])
+
+    # a start that replaces a run ends the old one in its own history
+    first = Sent(module)
+    first.done()
+    second = Sent(module, first.tracker, cache=first.cache, cwd=first.repo, start={"replace": True}, clock=100)
+    ended = first.tracker.events(first.run_id)
+    check("a run replaced by a new start ends in its own history as interrupted, and the new run names the one it replaced",
+          second.run_id != first.run_id and ended[-1]["type"] == "run-finished" and ended[-1]["payload"]["trackerOutcome"] == "interrupted"
+          and [e["clientSequence"] for e in ended] == list(range(1, len(ended) + 1))
+          and second.tracker.events(second.run_id)[0]["payload"]["replacedRunId"] == first.run_id and not SC.outboxes(first.cache), [e["type"] for e in ended])
+
+    # another session adopts a run: its unsent history moves with it
+    owner = Sent(module, SC.Tracker(SCHEMA, tools=()), cwd=new_repo(remote="https://example.com/acme/app.git"))
+    owner.done()
+    owner.done()
+    owner.done()
+    owner.done("BUILD: NEEDS DECISION keep the old export format?\n")
+    taken = SC.Tracker(SCHEMA, catalogs=[catalog])
+    adopted = module.run_command("resume", {"item": "I123", "workflow": "build", "answer": "yes", "cwd": owner.repo, "session": "s9", "now": "2026-03-04T05:00:00.000Z"},
+                                 SC.scripted_world(module, taken, owner.cache))
+    moved = taken.events(owner.run_id)
+    check("a run another session adopts takes its unsent history with it: one state file, no outbox left, the history sent in order under the new session",
+          is_run(adopted, "build", 2) and sorted(os.listdir(owner.folder())) == ["s9.I123.json"] and [e["clientSequence"] for e in moved] == list(range(1, len(moved) + 1))
+          and [e["type"] for e in moved][-3:] == ["run-adopted", "run-resumed", "step-issued"] and moved[-3]["payload"]["toSessionId"] == "s9"
+          and taken.runs[owner.run_id]["sessionId"] == "s9" and taken.refusals == [], (sorted(os.listdir(owner.folder())), [e["type"] for e in moved][-3:], taken.refusals))
+
+    # two commands on one run close together: neither loses nor repeats an event
+    quick = Sent(module)
+    quick.done(after=0)
+    quick.call("wait", {"item": "I123", "stepId": "start", "attempt": 1, "reason": "one"}, after=0)
+    quick.call("wait", {"item": "I123", "stepId": "start", "attempt": 1, "reason": "two"}, after=0)
+    quick.done(after=0)
+    check("commands in the same second are numbered on from each other: no event lost, none twice",
+          quick.held() == list(range(1, 9)) and [e["payload"]["command"]["n"] for e in quick.tracker.events(quick.run_id)] == [1, 1, 2, 2, 3, 4, 5, 5]
+          and quick.tracker.refusals == [], quick.held())
+
+    # what became of a send never puts back a state another command has written since
+    class Meanwhile(SC.Tracker):
+        """Fails the send, and while it is out another command of the same run is answered."""
+        inner, nested = None, None
+
+        def call(self, tool, arguments):
+            if self.inner and self.nested is None:
+                self.nested = False
+                self.nested = self.inner()
+            raise SC.Refused("unreachable")
+
+    race = Sent(module, Meanwhile(SCHEMA))
+    race.clock += 61
+    race.tracker.inner = lambda: race.call("wait", {"item": "I123", "stepId": "claim", "attempt": 1, "reason": "written meanwhile"}, after=0)
+    race.tracker.nested = None
+    outer = race.call("next", {"item": "I123"}, after=0)
+    state = race.state()
+    check("a command written while another one's send was out is not undone by that send's bookkeeping",
+          race.tracker.nested and state["steps"]["claim"]["waiting"] is not None and is_run(outer, "claim", 1), state["steps"]["claim"])
+    check("... and its event is in the outbox, numbered on, with none lost", race.unsent() == [1, 2, 3] and history(race.cache, race.run_id)[-1]["type"] == "step-waiting", race.unsent())
+
+    # the real network call, against a server of this machine only: reached, and one that never finishes answering
+    import http.server, threading
+
+    class Local(http.server.BaseHTTPRequestHandler):
+        tracker, hang, release, seen = SC.Tracker(SCHEMA, catalogs=[catalog]), False, threading.Event(), []
+
+        def log_message(self, *args):
+            pass
+
+        def do_POST(self):
+            body = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)))
+            Local.seen.append((self.path, self.headers.get("X-DevStride-Api-Key"), self.headers.get("X-DevStride-Organization-Id")))
+            if Local.hang:
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", "100000")
+                self.end_headers()
+                self.wfile.write(b'{"jsonrpc": "2.0", ')  # the headers and a first part arrive; the rest never does
+                self.wfile.flush()
+                Local.release.wait(60)
+                return
+            try:
+                text, failed = json.dumps(Local.tracker.call(body["params"]["name"], body["params"]["arguments"])), False
+            except SC.Refused as error:
+                text, failed = str(error), True
+            data = json.dumps({"jsonrpc": "2.0", "id": 1, "result": {"content": [{"type": "text", "text": text}], "isError": failed}}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Local)
+    server.daemon_threads = True
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        key = {"DEVSTRIDE_PLUGIN_TEST_URL": "http://127.0.0.1:%d" % server.server_address[1], "DEVSTRIDE_API_KEY": "test-key",
+               "DEVSTRIDE_API_SECRET": "test-secret", "DEVSTRIDE_ORG_ID": "test-org", "DEVSTRIDE_MACHINE_NAME": "test-machine"}
+        cache, repo = fresh("cache"), new_repo()
+        rc, answer, _, err = cli(ROOT, "start", {"definition": FIX["definitions"]["build"], "context": dict(FIX["context"], cwd=repo)}, cache, cwd=repo, env=key)
+        held = Local.tracker.events(answer["runId"]) if answer else []
+        check("through the real call, with the machine's key and name, a command's events reach the server and the outbox is gone",
+              rc == 0 and is_run(answer, "claim", 1) and "say" not in answer and [e["clientSequence"] for e in held] == [1, 2] and not SC.outboxes(cache)
+              and Local.seen[0] == ("/mcp", "test-key", "test-org") and Local.tracker.runs[answer["runId"]]["machine"] == "test-machine"
+              and "reports" not in answer, (rc, err, Local.seen[:1]))
+        Local.hang = True
+        began = time.time()
+        rc, slow, _, err = cli(ROOT, "done", {"item": "I123", "stepId": "claim", "attempt": 1, "output": canned("claim@1", repo)}, cache, cwd=repo, env=key)
+        took = time.time() - began
+        check("a server that starts answering and never finishes is given up on inside the time limit: the step is handed out, the events are kept (%.1fs)" % took,
+              rc == 0 and is_run(slow, "start", 1) and slow["say"] == HISTORY_LINE and 4 <= took < 9
+              and [e["clientSequence"] for e in history(cache, slow["runId"])] == [3, 4], (rc, took, err))
+        Local.hang = False
+        Local.release.set()
+        rc, late, _, err = cli(ROOT, "done", {"item": "I123", "stepId": "start", "attempt": 1, "output": canned("start@1", repo), "now": "2099-01-01T00:00:00Z"}, cache, cwd=repo, env=key)
+        check("... and they go with a later command, in order, once the server answers again",
+              rc == 0 and [e["clientSequence"] for e in Local.tracker.events(late["runId"])] == [1, 2, 3, 4, 5, 6] and not SC.outboxes(cache) and Local.tracker.refusals == [],
+              (rc, err, Local.tracker.refusals))
+        asked = len(Local.seen)
+        step = late["step"]
+        rc, other, _, err = cli(ROOT, "done", {"item": "I123", "stepId": step["id"], "attempt": step["attempt"], "output": canned(step["contract"], repo),
+                                               "now": "2099-01-01T00:10:00Z"}, cache, cwd=repo, env=dict(key, DEVSTRIDE_ORG_ID="other-org"))
+        with open(os.path.join(cache, "devstride-plugin", "workflows", "s1.I123.json")) as handle:
+            kept_for = json.load(handle).get("historyOrg")
+        check("the real key's organization is the one the history is kept for: the same run under another organization's key asks the server nothing",
+              rc == 0 and kept_for == "test-org" and len(Local.seen) == asked and [e["clientSequence"] for e in history(cache, other["runId"])] == [7, 8],
+              (rc, err, kept_for, len(Local.seen) - asked))
+    finally:
+        Local.release.set()
+        server.shutdown()
+        server.server_close()
+
+
+def section_records():
+    """A repaired step's attempt and the completeness check."""
     run = Driver()
     run.until("review")
     stopped = run.done(canned("review@1", run.repo).replace('"cycles"', '"rounds"'))
@@ -1532,15 +2010,20 @@ def section_static():
     check("the runner's syntax is valid for Python 3.8", old)
     imported = sorted(set(a.name.split(".")[0] for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names)
                       | set((n.module or "").split(".")[0] for n in ast.walk(tree) if isinstance(n, ast.ImportFrom)))
-    allowed = ["datetime", "hashlib", "importlib", "json", "os", "re", "secrets", "stat", "subprocess", "sys", "time"]
+    allowed = ["datetime", "hashlib", "importlib", "json", "os", "re", "secrets", "stat", "subprocess", "sys", "threading", "time"]
     check("the runner imports the standard library only (%s)" % " ".join(imported), imported == allowed, imported)
     check("the runner imports no network module", not set(imported) & {"socket", "http", "urllib", "ssl", "ftplib", "smtplib", "xmlrpc", "asyncio", "requests"}
           and not re.search(r"\b(socket|urllib|http\.client|ssl|requests)\b", source))
     helpers = re.findall(r'for name in \(([^)]*)\):\n\s+spec = importlib\.util\.spec_from_file_location', source)
-    check("the three helpers, the library skill cache and the branch matcher are loaded by file path, and nothing else is",
-          helpers == ['"workflow_report", "claim_record", "session_stop"'] and source.count("spec_from_file_location") == 3
+    check("the three helpers, the library skill cache, the branch matcher and the DevStride connection are loaded by file path, and nothing else is",
+          helpers == ['"workflow_report", "claim_record", "session_stop"'] and source.count("spec_from_file_location") == 4
           and 'spec_from_file_location("library_skill", LIBRARY_PATH)' in source
-          and 'spec_from_file_location("routing", path)' in source and "__import__" not in source, helpers)
+          and 'spec_from_file_location("routing", path)' in source and "__import__" not in source
+          and len(re.findall(r'spec_from_file_location\("devstride_connection", ', source)) == 1, helpers)
+    sends = [n for n in ast.walk(tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "call_tool"]
+    check("one place calls DevStride, through the connection helper, once and inside a time limit",
+          len(sends) == 1 and ast.get_source_segment(source, sends[0]) == 'module.call_tool(tool, arguments, key, timeout=seconds, attempts=1)'
+          and module_constant(tree, "SEND_SECONDS") == 5, [ast.get_source_segment(source, n) for n in sends])
     started = [n for n in ast.walk(tree) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and isinstance(n.func.value, ast.Name) and n.func.value.id == "subprocess"]
     check("one place starts a process, and it starts git", len(started) == 1 and started[0].func.attr == "run" and ast.get_source_segment(source, started[0].args[0]).startswith('["git", "-C", cwd]')
           and "os.system" not in source and "os.popen" not in source and "os.exec" not in source and "os.spawn" not in source, len(started))
@@ -1576,6 +2059,13 @@ def section_static():
     except module.GitFailed as error:
         said = str(error)
     check("a git that cannot do --verbatim stops the check with a reason that says so", "--verbatim" in said, said)
+
+
+def module_constant(tree, name):
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == name for t in node.targets) and isinstance(node.value, ast.Constant):
+            return node.value.value
+    return None
 
 
 def confirm_catalog():
@@ -1650,19 +2140,24 @@ def section_additions():
         check("an answer of %r is neither yes nor no: refused, nothing changed" % words,
               refused(cli(root, "resume", {"item": "I123", "answer": words}, cache), "confirm-answer")
               and open(os.path.join(cache, "devstride-plugin", "workflows", "s1.I123.json")).read() == before)
-    rc, answer, _, _ = cli(root, "resume", {"item": "I123", "answer": "Yes, go on without it"}, cache)
+    yes = "Yes, go on without it " + "x" * 2100  # longer than an event may carry
+    rc, answer, _, _ = cli(root, "resume", {"item": "I123", "answer": yes}, cache)
     check_state = state_of(cache, "s1.I123.json")["steps"]["check"]
+    sent = dict((e["type"], e["payload"]) for call in answer.get("reports", []) for e in call["events"])
+    check("the person's reply is cut to an event's limit in both events that carry it: the resume and the step's result",
+          sent["run-resumed"]["answer"] == yes[:2000] and sent["step-answered"]["result"] == {"state": "not run", "answer": yes[:2000]},
+          (len(sent["run-resumed"]["answer"]), len(sent["step-answered"]["result"]["answer"])))
     check("a yes records the verdict as accepted without running the step again",
           is_run(answer, "after", 1) and check_state["attempt"] == 1 and check_state["status"] == "done" and check_state["accepted"] is True
           and check_state["verdict"] == "CHECK: NOT RUN (accepted)"
           and [(r["stepId"], r["attempt"], r["status"], r.get("verdict")) for r in reports_of(answer)]
           == [("check", 1, "done", "CHECK: NOT RUN (accepted)"), ("after", 1, "running", None)], (answer, check_state))
     check("the accepted answer's text reaches a later step through the result, beside what the step gave",
-          answer["payload"]["said"] == "Yes, go on without it" and answer["payload"]["state"] == "not run", answer["payload"])
+          answer["payload"]["said"] == yes and answer["payload"]["state"] == "not run", answer["payload"])
     rc, answer, _, _ = cli(root, "done", {"item": "I123", "stepId": "after", "attempt": 1, "output": "AFTER: DONE\n"}, cache)
     check("the run then finishes, and the accepted step's result carries the answer",
           answer["action"] == "finished" and answer["outcome"] == "completed"
-          and answer["results"]["confirm-check@1"] == {"state": "not run", "answer": "Yes, go on without it"}, answer)
+          and answer["results"]["confirm-check@1"] == {"state": "not run", "answer": yes}, answer)
 
     cache = fresh("cache")
     start(cache)
@@ -1699,11 +2194,11 @@ def section_additions():
     a = first["runId"]
     result = begin(cache)
     check("a second start with no item of the same workflow is refused while the first is open: one such run to a session, as before run ids",
-          is_run(first, "check", 1) and refused(result, "run-open") and "no item" in result[3] and os.listdir(folder) == ["s1.%s.json" % a],
-          (result[3], os.listdir(folder)))
+          is_run(first, "check", 1) and refused(result, "run-open") and "no item" in result[3] and state_files(folder) == ["s1.%s.json" % a],
+          (result[3], state_files(folder)))
     rc, again, _, _ = begin(cache, fetched={"match": None})
     check("... with the tracker's answer the open run comes back where it is, with no notice, and no second run starts",
-          rc == 0 and again["runId"] == a and is_run(again, "check", 1) and again["notice"] is None and os.listdir(folder) == ["s1.%s.json" % a], again)
+          rc == 0 and again["runId"] == a and is_run(again, "check", 1) and again["notice"] is None and state_files(folder) == ["s1.%s.json" % a], again)
     rc, replaced, _, _ = begin(cache, replace=True)
     check("... and replace ends it as interrupted, in its own file, and starts another",
           rc == 0 and replaced["runId"] != a and (replaced["reports"][0]["runId"], replaced["reports"][0]["run"]["outcome"]) == (a, "interrupted")
@@ -1718,7 +2213,7 @@ def section_additions():
     a, b = first["runId"], second["runId"]
     check("a run with no item of another workflow starts beside the first: two runs, one file each, named by run id",
           rc == 0 and is_run(first, "check", 1) and is_run(second, "check", 1) and a != b
-          and sorted(os.listdir(folder)) == sorted(["s1.%s.json" % a, "s1.%s.json" % b]), os.listdir(folder))
+          and state_files(folder) == sorted(["s1.%s.json" % a, "s1.%s.json" % b]), state_files(folder))
     check("... and each workflow's own second start is still refused", refused(begin(cache), "run-open") and refused(begin(cache, definition=another), "run-open"))
     check("with two open runs, a command that names neither is refused", refused(cli(root, "next", {}, cache), "ambiguous-run"))
     rc, listed, _, _ = cli(root, "status", {"all": True}, cache)
@@ -1762,10 +2257,10 @@ def section_additions():
     a = start(cache, item=None)["runId"]
     rc, second, _, _ = begin(cache, beside=True)
     check("a start that says beside begins a second run of the same workflow while the first is open",
-          rc == 0 and is_run(second, "check", 1) and second["runId"] != a and len(os.listdir(folder)) == 2
-          and state_of(cache, "s1.%s.json" % a)["outcome"] is None, (second, os.listdir(folder)))
+          rc == 0 and is_run(second, "check", 1) and second["runId"] != a and len(state_files(folder)) == 2
+          and state_of(cache, "s1.%s.json" % a)["outcome"] is None, (second, state_files(folder)))
     check("... after which a plain start, a replace and a start with the tracker's answer are each refused: nothing says which run is meant",
-          all(refused(begin(cache, **more), "ambiguous-run") for more in ({}, {"replace": True}, {"fetched": {"match": None}})) and len(os.listdir(folder)) == 2)
+          all(refused(begin(cache, **more), "ambiguous-run") for more in ({}, {"replace": True}, {"fetched": {"match": None}})) and len(state_files(folder)) == 2)
     cli(root, "resume", {"runId": a, "close": True}, cache)
     check("... until one of them is over: then the other is the session's one open run again", refused(begin(cache), "run-open"))
     for label, more, item in (("with an item", {"beside": True}, "I123"), ("with replace", {"beside": True, "replace": True}, None), ("as text", {"beside": "yes"}, None)):
@@ -1782,10 +2277,10 @@ def section_additions():
     check("the list shows a run kept under the earlier name", [run["runId"] for run in cli(root, "status", {"all": True}, cache)[1]["runs"]] == [old])
     rc, answer, _, _ = cli(root, "next", {}, cache)
     check("... and the next command carries it on in one file named by its run id",
-          is_run(answer, "check", 1) and answer["runId"] == old and os.listdir(folder) == ["s1.%s.json" % old], os.listdir(folder))
+          is_run(answer, "check", 1) and answer["runId"] == old and state_files(folder) == ["s1.%s.json" % old], state_files(folder))
     os.rename(os.path.join(folder, "s1.%s.json" % old), os.path.join(folder, "s1.run.json"))
     rc, answer, _, err = cli(root, "resume", {"runId": old, "cwd": here}, cache, cwd=here, session="s2")
-    check("... and another session adopts it by its run id", rc == 0 and answer["runId"] == old and os.listdir(folder) == ["s2.%s.json" % old], (err, os.listdir(folder)))
+    check("... and another session adopts it by its run id", rc == 0 and answer["runId"] == old and sorted(os.listdir(folder)) == ["s2.%s.json" % old, "s2.%s.outbox.json" % old], (err, os.listdir(folder)))
     # start meets a run kept under the earlier name exactly as it meets any other: refused, handed back, replaced
     for label, more, good in (
             ("is refused", {}, lambda result, files: refused(result, "run-open") and files == ["s1.%s.json" % old]),
@@ -1800,25 +2295,22 @@ def section_additions():
         os.rename(os.path.join(folder, "s1.%s.json" % old), os.path.join(folder, "s1.run.json"))
         result = begin(cache, cwd=here, **more)
         check("a start with no item that meets a run kept under the earlier name %s, and it is kept in one file under its run id" % label,
-              good(result, sorted(os.listdir(folder))), (result[3], sorted(os.listdir(folder))))
-    # a replay acknowledged by run id never leaves the run in two files
+              good(result, state_files(folder)), (result[3], state_files(folder)))
+    # a finished run kept under the earlier name still owes its history, and is listed as one run
     cache = fresh("cache")
     folder = os.path.join(cache, "devstride-plugin", "workflows")
     old = start(cache, item=None, cwd=here)["runId"]
-    cli(root, "reported", {"ok": False}, cache, cwd=here)
     cli(root, "done", {"stepId": "check", "attempt": 1, "output": "CHECK: CLEAR\n"}, cache, cwd=here)
     cli(root, "done", {"stepId": "after", "attempt": 1, "output": "AFTER: DONE\n"}, cache, cwd=here)
     os.rename(os.path.join(folder, "s1.%s.json" % old), os.path.join(folder, "s1.run.json"))
-    listed = cli(root, "unsent", {"cwd": here}, cache, cwd=here, session="s2")[1]
-    check("a finished run kept under the earlier name, whose reports failed, is handed out for a replay", [run["runId"] for run in listed["runs"]] == [old], listed)
-    rc, answer, _, err = cli(root, "reported", {"runId": old, "ok": True}, cache, cwd=here, session="s2")
-    check("acknowledging the replay by run id clears it in one file, named by its run id",
-          rc == 0 and answer == {"runId": old, "unsent": False, "say": None} and os.listdir(folder) == ["s1.%s.json" % old]
-          and "reportsUnsent" not in state_of(cache, "s1.%s.json" % old), (err, os.listdir(folder)))
-    rc, answer, _, err = cli(root, "reported", {"runId": old, "ok": True}, cache, cwd=here, session="s2")
-    check("... so a second acknowledgement finds the one run again, and nothing is left to replay",
-          rc == 0 and answer["unsent"] is False and os.listdir(folder) == ["s1.%s.json" % old]
-          and cli(root, "unsent", {"cwd": here}, cache, cwd=here, session="s2")[1]["runs"] == [], (rc, err))
+    listed = cli(root, "status", {"all": True, "unsent": True, "others": True, "cwd": here}, cache, cwd=here, session="s2")[1]
+    check("a finished run kept under the earlier name, whose history DevStride does not hold, is listed once with what it owes",
+          [(run["runId"], run["sessionId"], run["item"], run["events"], run["ended"]) for run in listed["unsent"]] == [(old, "s1", None, 6, True)]
+          and sorted(os.listdir(folder)) == ["s1.%s.outbox.json" % old, "s1.run.json"], (listed.get("unsent"), os.listdir(folder)))
+    rc, again, _, err = cli(root, "status", {"all": True, "unsent": True}, cache, cwd=here)
+    check("... listing it changes nothing, and with no unsent asked for none is listed",
+          rc == 0 and again["unsent"] == listed["unsent"] and "unsent" not in cli(root, "status", {"all": True}, cache, cwd=here)[1]
+          and sorted(os.listdir(folder)) == ["s1.%s.outbox.json" % old, "s1.run.json"], (rc, err))
     # adoption keeps the same rule: one open run with no item of a workflow to a session
     cache = fresh("cache")
     theirs = start(cache, item=None, cwd=here, session="s1")["runId"]
@@ -1863,8 +2355,8 @@ def section_additions():
           status["state"] == "running" and status["rows"][0]["status"] == "waiting" and run.state()["current"] == {"stepId": "claim", "attempt": 1}, status)
     check("the list of runs carries what it waits for", run.call("status", {"all": True})[1]["runs"][0]["waiting"] == reason)
     answer = run.next()
-    check("the step asked for again is handed back as it was, still reported waiting",
-          is_run(answer, "claim", 1) and run.step_reports([answer])[0]["status"] == "waiting", answer)
+    check("the step asked for again is handed back as it was, still waiting in the run's history, with no new event",
+          is_run(answer, "claim", 1) and "reports" not in answer and history(run.cache, answer["runId"])[-1]["type"] == "step-waiting", answer)
     rc, answer, _, _ = run.call("wait", {"item": "I123", "stepId": "claim", "attempt": 1})
     check("a wait with no reason says Waiting", rc == 0 and answer["waiting"]["reason"] == "Waiting", answer)
     rc, answer, _, _ = run.call("wait", {"item": "I123", "stepId": "claim", "attempt": 1, "reason": "waiting with gh" + "p_abcdefghijklmnop"})
@@ -1933,8 +2425,9 @@ def section_outcomes():
             check("rollup start: %s -> %s" % (case["name"], case["expect"]), refused(run.result, case["expect"])
                   and case.get("message", "") in run.result[3] and not os.listdir(run.cache), run.result[3])
     wanted = sorted(["completed", "failed", "interrupted", "landed", "handed-up", "shipped", "ended-early"])
-    check("the runner's tracker outcomes are the literal list", sorted(module.TRACKER_OUTCOMES) == wanted
-          and sorted(module.REPORT.RUN_OUTCOMES) == wanted and module.RECORDED_OUTCOMES == ("landed", "handed-up", "shipped"))
+    check("the runner's tracker outcomes are the literal list, kept once: the shared helper holds no copy",
+          sorted(module.TRACKER_OUTCOMES) == wanted and not hasattr(module.REPORT, "RUN_OUTCOMES")
+          and module.RECORDED_OUTCOMES == ("landed", "handed-up", "shipped"))
     for case in FIX["outcomes"]["ends"]:
         fetched = {"match": None} if "runOutcomes" not in case else {"match": None, "runOutcomes": case["runOutcomes"]}
         run = Driver(definition=case["definition"], fetched=fetched)
@@ -1949,14 +2442,14 @@ def section_outcomes():
             ended = (answer["action"] == "finished" and answer["outcome"] == case["outcome"]
                      and answer["recordedOutcome"] == case["recordedOutcome"])
         check("run end: %s" % case["name"], ended and closes(answer, case["reported"]), (answer, answer.get("reports", [])[-1:]))
-    # the wrapped form of the tracker's answer reads the same, and a replay names the same end
+    # the wrapped form of the tracker's answer reads the same, and the run's history names the same end
     run = Driver(fetched={"data": {"match": None, "runOutcomes": ["landed"]}})
     while run.answer["action"] == "run":
         run.done("COMPLETE: LANDED\n" + canned("complete@1").split("\n", 1)[1] if run.answer["step"]["contract"] == "complete@1" else None)
     check("a wrapped answer's runOutcomes count, and the run closes landed", closes(run.answer, "landed"), run.answer.get("reports"))
-    state = run.state()
-    replay = module.replay_reports(state, REAL_CATALOG["contracts"], module.World())
-    check("a replay of the ended run closes it landed too", replay and replay[-1].get("run", {}).get("outcome") == "landed", replay[-1:])
+    ended = history(run.cache, run.answer["runId"])[-1]
+    check("the run's last event closes it landed too, and says how the run itself ended",
+          (ended["type"], ended["payload"]["trackerOutcome"], ended["payload"]["outcome"]) == ("run-finished", "landed", run.state()["outcome"]), ended)
     # the latest recording step wins: a later continue verdict that records another outcome
     catalog = copy.deepcopy(REAL_CATALOG)
     catalog["contracts"]["capture@1"]["verdict"]["values"][1]["recordsOutcome"] = "handed-up"  # FINDINGS: NONE, its canned answer
@@ -2013,9 +2506,8 @@ def section_stopped():
     rc, status, _, err = run.call("status", {"item": "I123"})
     check("status still answers, and shows the step the run waits at", rc == 0 and status is not None
           and [row["stepId"] for row in status["rows"] if row["status"] == "issued"] == [issued["id"]], err)
-    check("status of every run, unsent, reported and judge still answer",
-          run.call("status", {"all": True})[0] == 0 and run.call("unsent", {"cwd": run.cwd})[0] == 0
-          and run.call("reported", {"item": "I123", "ok": True})[0] == 0
+    check("status of every run, with the history not sent yet, and judge still answer",
+          run.call("status", {"all": True})[0] == 0 and run.call("status", {"all": True, "unsent": True, "cwd": run.cwd})[0] == 0
           and run.call("judge", {"item": "I123", "answer": {"runs": []}})[1]["verdict"] == "not-reported")
     check("repository still answers", cli(run.root, "repository", {}, run.cache, cwd=run.cwd)[0] == 0)
 
@@ -2059,7 +2551,7 @@ def section_stopped():
 SECTIONS = {"catalog": section_catalog, "validation": section_validation, "verdicts": section_verdicts,
             "proof-fixtures": section_proof_fixtures, "lifecycle": section_lifecycle, "proofs": section_proofs,
             "stand-in": section_stand_in, "evidence": section_evidence, "state": section_state,
-            "reporting": section_reporting, "records": section_records, "repository": section_repository, "static": section_static,
+            "reporting": section_reporting, "history": section_history, "records": section_records, "repository": section_repository, "static": section_static,
             "additions": section_additions, "outcomes": section_outcomes, "stopped": section_stopped}
 SECTIONS[SECTION]()
 print("ran %d" % counter[0])
@@ -2084,8 +2576,9 @@ section proofs 71
 section stand-in 3
 section evidence 79
 section state 29
-section reporting 4
-section records 24
+section reporting 5
+section history 40
+section records 12
 section repository 7
 section static 18
 section additions 85

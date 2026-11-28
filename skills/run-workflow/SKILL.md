@@ -27,7 +27,8 @@ stdout. Exit 2 is a refusal: say its one line in plain words and stop; nothing c
 runner failed; say its line and stop, never retrying.
 
 1. **Resolve the definition**: `${CLAUDE_PLUGIN_ROOT}/workflows/<workflow id>.json`, and fetch the
-   organization's (`references/fetching-the-workflow.md`). Neither applies to the trigger: say
+   organization's (`${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/references/fetching-the-workflow.md`).
+   Neither applies to the trigger: say
    "No workflow applies to this work." and stop.
 2. **`start`** with that path as `definitionFile`, the answer as `fetched`, and a `context` holding `trigger` and every key the
    reference's Commands section lists (`mode` is a story-claim mode, `named` for a named item).
@@ -39,9 +40,9 @@ runner failed; say its line and stop, never retrying.
    `${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/references/gates.md` in full when an answer is
    `request-gate`, `parked` or `address-changes`, and
    `${CLAUDE_PLUGIN_ROOT}/skills/run-workflow/references/conditions.md` in full on `need-facts`.
-4. **Send `reports`** in order exactly as
-   `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/workflow-reports.md` says: its gate decides
-   whether and how; it fails open, and a run's first failure is said once.
+4. **Forward no history.** The runner keeps the run's history and sends it itself
+   (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/workflow-reports.md`); say an answer's
+   `say` once. It fails open.
 5. **On `stopped`**: say the reason in plain words and what the person can do about that kind of
    stop, then stop. `resume` continues the run once the cause is fixed.
 6. **On `finished`**: say the outcome in plain words, and each non-empty list of

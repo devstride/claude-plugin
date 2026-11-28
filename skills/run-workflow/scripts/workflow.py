@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """The step runner: it walks a workflow definition one step at a time and remembers where it is.
 
-It decides and records; it never acts. It has no network and no tracker access, runs no skill,
-and reads a repository only through read-only git commands (`rev-parse`, `diff`, `patch-id`,
-and `ls-tree` and `cat-file` for a committed repository skill file) plus the remote lookup of the
-reporting helper. A workflow the tracker answered for the item is handed to `start` as data
+It decides and records; it never acts. It runs no skill, and reads a repository only through
+read-only git commands (`rev-parse`, `diff`, `patch-id`, and `ls-tree` and `cat-file` for a
+committed repository skill file) plus the remote lookup of the reporting helper. Its only use of
+the network is one bounded call per command: once a command's state is written, it sends the run's
+own unsent history to DevStride (a few calls when more is owed, five seconds at most in all), and a
+failure changes nothing about the run. A workflow the tracker answered for the item is handed to `start` as data
 (`fetched`); the runner checks it and falls back to the built-in definition it was also given. A person, another agent or the
 plugin's own loop asks it what is next, runs that step, hands the step's answer back, and gets
 the same answers every time, also after a restart or a cleared conversation. The rules are in
@@ -19,11 +21,9 @@ the same answers every time, also after a restart or a cleared conversation. The
           start needs `context.rollup`, rollup.py ready's answer, with the verdict READY
   next    {"runId"?, "item"?, "gateAnswer"?, "facts"?}  gateAnswer: what get_workflow_gate read at the gate the run is parked at
   done    {"runId"?, "item"?, "stepId", "attempt", "output"}
-  status  {"runId"?, "item"?, "includeDefinition"?, "evidence"?} | {"all": true, "others"?, "cwd"?}
+  status  {"runId"?, "item"?, "evidence"?} | {"all": true, "others"?, "cwd"?, "unsent"?}
   resume  {"runId"?, "item"?, "workflow"?, "answer"?, "session"?, "beside"?}
   wait    {"runId"?, "item"?, "stepId", "attempt", "reason"?}   the issued step is waiting inside itself
-  reported {"runId"?, "item"?, "ok"}       what became of a run's reports; the first failure hands back one line to say
-  unsent  {"cwd"?}                         this repository's runs whose reports failed, each shaped again in full
   judge   {"item", "answer"}               whether the newest tracked run of an item did every required step
   repository                               (no stdin) {"repository": "host/owner/name" | null} for this checkout
 
@@ -33,7 +33,12 @@ with the next action: `run` (the step to run, the skill, its payload and argumen
 to send), `finished` or `stopped`; at an approval gate or a checkpoint, `request-gate`, `parked` or
 `address-changes`; at a conditional step whose facts are not yet known, `need-facts`. `start`, `next`,
 `done` and `resume` may carry `facts` (references/conditions.md): what a condition is decided from.
-Every answer carries `reports`: ready argument objects for the tracker's step-recording tool. Sending them is the caller's job and may fail without consequence.
+The runner keeps the run's history itself (skills/build-item/references/workflow-reports.md): one
+event for each change (a step handed out, answered, decided, waiting; the run stopped, resumed,
+rewound, taken over, finished), numbered from 1 and shaped as schemas/run-events.schema.json says.
+The caller forwards nothing. An answer carries `say`, one line for the person, the first time the
+history cannot be sent. With `workflows` set to null in the checkout's .claude/ds-config.json, or
+DEVSTRIDE_WORKFLOWS=0, nothing is kept and nothing is sent.
 
 Exit 0 with an answer; 2 with exactly one `workflow: <code>: <message>` line on stderr and nothing
 on stdout for a refusal; 1 (also one `workflow:` line) for anything else. Never a traceback.
@@ -41,13 +46,14 @@ on stdout for a refusal; 1 (also one `workflow:` line) for anything else. Never 
 A session a person stopped from DevStride gets no step: while this machine keeps a stop for the
 session the request names, or for the calling agent's own (skills/build-item/scripts/session_stop.py),
 `start`, `next`, `done`, `wait` and `resume` are refused with `stopped-by-director` and the line that
-says who stopped it, when and why, and nothing changes; `status`, `reported`, `unsent`, `judge` and
-`repository` still answer. Once a person allows the session to continue, `resume` carries the run on.
+says who stopped it, when and why, and nothing changes; `status`, `judge` and `repository` still
+answer. Once a person allows the session to continue, `resume` carries the run on.
 
 State: one file per session and item (a run with no item: per session and run id, and a session
 holds one open such run of a workflow unless a start says `beside`) under
 ${XDG_CACHE_HOME:-~/.cache}/devstride-plugin/workflows, owner-only, written atomically, pruned
-after seven days.
+after seven days. Events DevStride does not hold yet wait in an outbox file beside it
+(`<session>.<item or run id>.outbox.json`, the same rules, at most 4 MB).
 """
 import hashlib
 import importlib.util
@@ -58,6 +64,7 @@ import secrets
 import stat
 import subprocess
 import sys
+import threading
 import time
 from datetime import datetime, timezone
 
@@ -66,7 +73,7 @@ sys.dont_write_bytecode = True  # loading the helpers below must never write int
 HERE = os.path.dirname(os.path.abspath(__file__))
 PLUGIN_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
 CATALOG_PATH = os.path.join(PLUGIN_ROOT, "schemas", "step-contracts.json")
-COMMANDS = ("start", "next", "done", "wait", "status", "resume", "reported", "unsent", "judge", "repository")
+COMMANDS = ("start", "next", "done", "wait", "status", "resume", "judge", "repository")
 MOVING = ("start", "next", "done", "wait", "resume")  # the commands that move a run on: a stopped session gets none
 
 KEEP_SECONDS = 7 * 24 * 3600
@@ -75,9 +82,31 @@ REQUEST_MAX_BYTES = 4 * 1048576
 DEFINITION_FILE_MAX_BYTES = 256 * 1024
 RESULT_MAX_BYTES = 16 * 1024
 ANSWER_MAX_CHARS = 8000
-UNSENT_MAX_RUNS = 10
-UNSENT_LINE = ("Step reports for this run are not reaching the tracker, so it will not show there yet. "
-               "The run carries on; once it is over, a later session building in this repository sends them.")
+# The run's history (schemas/run-events.schema.json): what one event and one outbox may hold, how
+# the unsent events are sent, and the one line a person is told when they are not getting through.
+OUTBOX_SUFFIX = ".outbox.json"
+OUTBOX_MAX_BYTES = 4 * 1048576
+EVENT_PAYLOAD_MAX_BYTES = 32 * 1024
+EVENT_SEQ_MAX = 1000000
+EVENT_LIST_MAX = 480          # step ids and per-step lines in one event
+EVENT_FACTS_MAX = 200         # condition facts of one kind in one event
+EVENT_ANSWER_MAX = 2000       # a person's reply, as an event carries it
+EVENT_BATCH = 50
+RECORD_TOOL, CATALOG_TOOL = "record_workflow_run_events", "put_step_contract_catalog"
+SEND_SECONDS = 5              # one call's limit, and the limit of every call one command makes together
+SEND_LEAST_SECONDS = 0.5      # with less than this left of the limit, the rest waits for the next command
+SEND_SKIP_SECONDS = 60        # after a failed send, how long the next commands do not try
+LEFT_BEHIND_MAX = 3           # ended runs' unsent history one command sends after its own
+HISTORY_LINE = ("This run's history is not reaching DevStride yet; the run carries on, and the history is sent "
+                "once DevStride can be reached.")
+HISTORY_STOPPED = {
+    "history-full": "DevStride holds as much history as it keeps for one run, so the rest of this run's history "
+                    "is not kept there; the run carries on.",
+    "outbox-full": "This run's unsent history has outgrown what this machine keeps for it, so the rest of its "
+                   "history is not kept; the run carries on.",
+    "gap": "DevStride is missing a part of this run's history that this machine no longer holds, so the rest "
+           "of its history is not kept there; the run carries on.",
+}
 AUTO_REDO_LIMIT = 5  # a contract may raise it with maxAutoRedo, never above AUTO_REDO_MAX
 AUTO_REDO_MAX = 20
 GIT_READ_ONLY = ("rev-parse", "diff", "patch-id", "ls-tree", "cat-file")
@@ -199,9 +228,6 @@ RUN_OUTCOME = {
 # A run stopped to ask a person something (`needs-person`) is not ended: it is told its waiting step
 # and stays open, so it goes on as the same run once the person answers.
 OPEN_STOPS = ("needs-person",)
-# A step asked of a person in the tracker and not answered yet: parked (the run waits for it) or
-# open (a checkpoint the run went on without). The tracker is told `waiting` for both.
-PARKED_STATUSES = ("parked", "open")
 TRACKER_OUTCOMES = ("completed", "failed", "interrupted", "ended-early", "landed", "handed-up", "shipped")
 RECORDED_OUTCOMES = ("landed", "handed-up", "shipped")
 
@@ -245,8 +271,10 @@ MISSING = object()
 CONFIG_MAX_BYTES = 1 << 20
 # The first evidence line of a step the runner answered from the repository's config (config_skip).
 DECIDED_NOTE = "Decided from the repository's config, with no model turn: "
-REPORT = None   # skills/build-item/scripts/workflow_report.py: hashing, normalizing, capping, report shape
-CLAIMS = None   # skills/build-item/scripts/claim_record.py: the session id and the plugin version
+REPORT = None   # skills/build-item/scripts/workflow_report.py: hashing, normalizing, capping, the off switch
+CLAIMS = None   # skills/build-item/scripts/claim_record.py: the session id, the machine name and the plugin version
+CONNECTION = None  # skills/build-item/scripts/devstride_connection.py, loaded only when history is sent
+CATALOG_DOCUMENT = None  # schemas/step-contracts.json as load_catalog read it: its hash names it to DevStride
 STOPS = None    # skills/build-item/scripts/session_stop.py: the stop a person asked for, kept on this machine
 
 
@@ -260,6 +288,10 @@ class Refuse(Exception):
 
 class GitFailed(Exception):
     """Git could not answer. A proof that cannot be checked is never treated as valid."""
+
+
+class SendFailed(Exception):
+    """The run's history could not be sent this time. Never a reason to stop a run."""
 
 
 def load_helpers():
@@ -280,7 +312,42 @@ def load_helpers():
         REPORT, CLAIMS, STOPS = loaded
 
 
-# The few calls that differ on Windows, kept here: the runner's own code calls no module but its helpers and
+def connection():
+    """The helper that finds this machine's DevStride key and makes the call, loaded by file path and
+    only by a command that has history to send. It finds its own neighbours by name, so their
+    folder goes first on the module path."""
+    global CONNECTION
+    if CONNECTION is None:
+        folder = os.path.join(os.path.dirname(os.path.dirname(HERE)), "build-item/scripts")
+        if folder not in sys.path:
+            sys.path.insert(0, folder)
+        spec = importlib.util.spec_from_file_location("devstride_connection", os.path.join(folder, "devstride_connection.py"))
+        module = importlib.util.module_from_spec(spec)
+        sys.modules["devstride_connection"] = module
+        try:
+            spec.loader.exec_module(module)
+        except BaseException:
+            sys.modules.pop("devstride_connection", None)
+            raise
+        CONNECTION = module
+    return CONNECTION
+
+
+def checkout_top(start):
+    """The checkout a folder is in: the nearest folder holding .git (a folder, or a worktree's file), or None."""
+    if not isinstance(start, str) or not start:
+        return None
+    here = os.path.realpath(start)
+    while True:
+        if os.path.exists(os.path.join(here, ".git")):
+            return here
+        parent = os.path.dirname(here)
+        if parent == here:
+            return None
+        here = parent
+
+
+# The few calls that differ on Windows, kept here: the runner loads no module but its two helpers and
 # the library skill cache (the build-item skill's portable.py holds the same rules for every other script).
 
 def os_flags(*names):
@@ -319,7 +386,7 @@ def run_git(cwd, *args, **options):
 
 
 class World:
-    """Everything outside the runner's own state: the environment, the clock, git and the user."""
+    """Everything outside the runner's own state: the environment, the clock, git, the user and DevStride."""
 
     def __init__(self, env=None, git=run_git, uid=None, now=None):
         self.env = os.environ if env is None else env
@@ -332,6 +399,52 @@ class World:
             return self._now
         moment = datetime.now(timezone.utc)
         return moment.strftime("%Y-%m-%dT%H:%M:%S.") + "%03dZ" % (moment.microsecond // 1000)
+
+    def send(self, tool, arguments, cwd=None, seconds=SEND_SECONDS):
+        """The only network call: one DevStride tool call with this machine's own key, found from the
+        run's checkout as the session reporter finds it. One attempt, and never longer than
+        `seconds` in all: a server that answers slowly, or never finishes answering, is given up on.
+        Returns the tool's answer; SendFailed for anything else, whatever went wrong."""
+        try:
+            module, key = self.key(cwd)
+        except Exception as error:
+            raise SendFailed(error.__class__.__name__)
+        box = {}
+
+        def call():
+            try:
+                box["answer"] = module.call_tool(tool, arguments, key, timeout=seconds, attempts=1)
+            except Exception as error:  # every failure reads the same to the run: not sent this time
+                box["failed"] = error.__class__.__name__
+
+        worker = threading.Thread(target=call, daemon=True)  # a daemon: a call given up on never holds the command open
+        worker.start()
+        worker.join(seconds)
+        if worker.is_alive() or "answer" not in box:
+            raise SendFailed(box.get("failed") or "timeout")
+        return box["answer"]
+
+    def key(self, cwd):
+        """The helper that calls DevStride and this machine's key for a checkout. Reads files only."""
+        module = connection()
+        return module, module.credentials(self.env, module.config_file(self.env),
+                                          module.project_places(checkout_top(cwd), cwd), reporter=True)
+
+    def organization(self, cwd):
+        """The organization a checkout's key signs in to, or None when no key is found. Never raises."""
+        try:
+            found = self.key(cwd)[1].get("DEVSTRIDE_ORG_ID")
+            return found if isinstance(found, str) and found else None
+        except Exception:
+            return None
+
+    def machine(self):
+        """This machine's name as every claim spells it, or None."""
+        try:
+            named = self.env.get("DEVSTRIDE_MACHINE_NAME")
+            return CLAIMS.machine_name(self.env, hostname="" if named else None) or None
+        except Exception:
+            return None
 
     def head(self, cwd):
         """The full commit id HEAD is on: read once, then every proof is checked against it."""
@@ -762,9 +875,21 @@ def load_catalog():
     faults = check_catalog(catalog)
     if faults:
         raise RuntimeError("the step contract catalog is unsound (%s)" % faults[0])
+    global CATALOG_DOCUMENT
+    CATALOG_DOCUMENT = catalog
     DORMANT_SKILLS.clear()
     DORMANT_SKILLS.update(catalog.get("dormantSkills", {}))
     return catalog["contracts"]
+
+
+def catalog_hash():
+    """The name DevStride knows this plugin's step contract catalog by: the hash of its canonical form."""
+    try:
+        if CATALOG_DOCUMENT is None:
+            load_catalog()
+        return REPORT.definition_hash(CATALOG_DOCUMENT)
+    except (ValueError, TypeError, RecursionError, RuntimeError):
+        return "0" * 64
 
 
 def providers_of(contracts, need):
@@ -1204,6 +1329,8 @@ NOTICES = {
     "unrunnable": "The workflow from DevStride could not be run by this plugin ({reason}); running the built-in workflow.",
     "organization": "Using your organization's workflow {name} (version {n}).",
 }
+# Why the runner hands a step out again, as an event names it (None: the plain order, or a person's resume).
+EVENT_CAUSES = (None, "stale", "mismatch", "rewind", "redo", "changes", "reclaim")
 SOURCE_LABELS = {
     None: "your organization's", "not-fetched": "built-in", "no-match": "built-in",
     "ABSENT": "built-in (DevStride unavailable)", "FORBIDDEN": "built-in (DevStride unavailable)",
@@ -1613,6 +1740,11 @@ def state_name(session, item, run_id):
     return "%s.%s.json" % (session, item or run_id)
 
 
+def is_state_name(name):
+    """A name a state file may have: never a temporary file, never an outbox."""
+    return name.endswith(".json") and not name.endswith(OUTBOX_SUFFIX) and not name.startswith(".")
+
+
 def legacy_name(session):
     """Where an earlier plugin kept a session's one run with no item."""
     return "%s.run.json" % session
@@ -1626,7 +1758,7 @@ def state_names(state):
 def settle_legacy(folder, session, world):
     """A run with no item that an earlier plugin wrote takes the name this one writes, so it is
     carried on in one file. The one rule for that file: whatever may write such a run settles it
-    first (find_run, a start, `reported` by run id; an adoption writes the adopter's file and
+    first (find_run, a start; an adoption writes the adopter's file and
     removes this one), and nothing ever writes the old name, so a run is never kept in two files."""
     old = os.path.join(folder, legacy_name(session))
     if not os.path.lexists(old):
@@ -1666,20 +1798,32 @@ def read_state(path, world):
     return state
 
 
-def write_state(folder, state):
+def write_file(folder, name, data):
     """Atomic and owner-only: a new file beside the final name, then moved over it."""
-    state["seq"] += 1
-    name = state_name(state["sessionId"], state["item"], state["runId"])
-    data = (json.dumps(state, separators=(",", ":"), sort_keys=True) + "\n").encode("utf-8")
-    if len(data) > STATE_MAX_BYTES:
-        raise Refuse("state-unusable", "the run's state has grown past %d bytes" % STATE_MAX_BYTES)
     temporary = os.path.join(folder, ".%s.%s.tmp" % (name, secrets.token_hex(8)))
     fd = os.open(temporary, os_flags("O_WRONLY", "O_CREAT", "O_EXCL", "O_NOFOLLOW"), 0o600)
     try:
-        os.write(fd, data)
+        left = memoryview(data)
+        while left:
+            left = left[os.write(fd, left):]
     finally:
         os.close(fd)
     replace_file(temporary, os.path.join(folder, name))  # replaces a link itself, never its target
+
+
+def store_state(folder, state):
+    """The state as it is, written whole. Only write_state counts a command; this is also how what
+    became of a send is kept after the command's own write."""
+    data = (json.dumps(state, separators=(",", ":"), sort_keys=True) + "\n").encode("utf-8")
+    if len(data) > STATE_MAX_BYTES:
+        raise Refuse("state-unusable", "the run's state has grown past %d bytes" % STATE_MAX_BYTES)
+    write_file(folder, state_name(state["sessionId"], state["item"], state["runId"]), data)
+
+
+def write_state(folder, state):
+    """One command's write: the command is counted, then the state is stored."""
+    state["seq"] += 1
+    store_state(folder, state)
 
 
 def prune(folder, world):
@@ -1722,7 +1866,7 @@ def open_without_item(world, folder, session, workflow):
     settle_legacy(folder, session, world)
     found = []
     for name in sorted(os.listdir(folder)):
-        if name.startswith(".") or not (name.startswith(session + ".") and name.endswith(".json")):
+        if not (is_state_name(name) and name.startswith(session + ".")):
             continue
         try:
             state = read_state(os.path.join(folder, name), world)
@@ -1752,7 +1896,7 @@ def find_run(world, request, session):
         names = [state_name(session, item, None)] if os.path.lexists(os.path.join(folder, state_name(session, item, None))) else []
     else:
         settle_legacy(folder, session, world)
-        names = sorted(name for name in os.listdir(folder) if name.startswith(session + ".") and name.endswith(".json"))
+        names = sorted(name for name in os.listdir(folder) if name.startswith(session + ".") and is_state_name(name))
     states = [read_state(os.path.join(folder, name), world) for name in names]
     states = [state for state in states if state.get("sessionId") == session]
     if run_id:
@@ -1764,6 +1908,479 @@ def find_run(world, request, session):
     if len(states) > 1:
         raise Refuse("ambiguous-run", "this session has %d open runs; name the item or the run" % len(states))
     return folder, states[0]
+
+
+# --- the run's history -----------------------------------------------------------------------------
+# One event for each change, journaled by the command that made it and kept in an outbox beside the
+# state until DevStride holds it. Nothing here ever refuses a command or stops a run: whatever goes
+# wrong, the run carries on, and its history is sent later or, at worst, has a hole.
+
+EVENT_TIME = re.compile(r"^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(\.[0-9]+)?(Z|[+-][0-9]{2}:[0-9]{2})$")
+SAFE_INTEGER = 2 ** 53 - 1
+BATCH_MAX_BYTES = 384 * 1024  # one batch's events, well under what DevStride takes in one call
+LEFT_BEHIND_TRIES = 3         # how often an ended run's history is tried before it is left for a person
+# What a payload over its limit loses, in order, and what stands in its place.
+EVENT_SPARE = (("proof", None), ("result", None), ("evidence", []), ("skillManifest", []), ("observed", None),
+               ("context", {}), ("answer", None), ("continuedPastFailures", []), ("openCheckpoints", []),
+               ("skippedByCondition", []), ("resetStepIds", []))
+
+
+def epoch_of(text):
+    """Seconds since 1970 for an ISO time, or None."""
+    match = EVENT_TIME.match(text) if isinstance(text, str) else None
+    if not match:
+        return None
+    try:
+        moment = datetime(*[int(match.group(at)) for at in range(1, 7)], tzinfo=timezone.utc)
+    except ValueError:
+        return None
+    seconds = moment.timestamp() + float("0" + (match.group(7) or ""))
+    zone = match.group(8)
+    if zone != "Z":
+        seconds -= (1 if zone[0] == "+" else -1) * (int(zone[1:3]) * 3600 + int(zone[4:6]) * 60)
+    return seconds
+
+
+def stamp(seconds):
+    """An ISO time in UTC, to the millisecond, for seconds since 1970."""
+    moment = datetime.fromtimestamp(seconds, timezone.utc)
+    return moment.strftime("%Y-%m-%dT%H:%M:%S.") + "%03dZ" % (moment.microsecond // 1000)
+
+
+def event_time(text):
+    """A time as an event carries it: UTC, at most six decimals, ending in Z."""
+    seconds = epoch_of(text)
+    if seconds is None:
+        return stamp(time.time())
+    if text.endswith("Z"):
+        return text[:19] + (EVENT_TIME.match(text).group(7) or "")[:7] + "Z"
+    return stamp(seconds)
+
+
+def event_text(value, limit):
+    """Text as one of an event's short fields carries it (one line, cut to its limit), or None."""
+    return (REPORT.clean_text(value, limit) or None) if isinstance(value, str) else None
+
+
+def event_line(value, fallback):
+    """A one-line field an event must carry: the text's first line, at most 200, never empty."""
+    return REPORT.clean_verdict(value) or fallback
+
+
+def event_answer(text):
+    """A person's reply as an event carries it: its first 2,000 characters, withheld whole when it holds a credential."""
+    if not isinstance(text, str):
+        return None
+    return WITHHELD if has_secret(text) else REPORT.clip(text, EVENT_ANSWER_MAX)
+
+
+def history_off(world, cwd):
+    """The one switch: `workflows` set to null in the checkout's .claude/ds-config.json, or the
+    machine variable DEVSTRIDE_WORKFLOWS=0. Off: nothing is kept and nothing is sent."""
+    config = {}
+    try:
+        # The checkout's own config, also for a run started in a folder below its top.
+        with open(os.path.join(checkout_top(cwd) or cwd, ".claude", "ds-config.json"), "rb") as handle:
+            data = handle.read(CONFIG_MAX_BYTES + 1)
+        found = json.loads(data.decode("utf-8")) if len(data) <= CONFIG_MAX_BYTES else None
+        if isinstance(found, dict) and "workflows" in found:
+            config = found["workflows"]
+    except (OSError, ValueError, UnicodeDecodeError, RecursionError, TypeError):
+        pass  # no config, or one that cannot be read: the key is not set
+    return REPORT.switched_off(config, world.env)
+
+
+_WORD = r"""[^/\\\s"'`:,;()\[\]{}<>|]+"""  # one word of a folder's name: no separator, space, quote or bracket
+_WORDS = _WORD + "(?: " + _WORD + "){1,2}"  # a Windows account's folder may be two or three words
+# The home folder a path on this machine starts with, as DevStride's own rule reads it: the folder
+# named Users or home at a path's start and the account's name after it; the Windows folder as its
+# Linux layer writes it, behind a drive letter; and a Windows drive's Users folder. A Windows name
+# may be up to three words, read so only when the path goes on with the same separator. Anchored to
+# a path's start: a web address is not one. ASCII, as the server's copy of the rule is.
+HOME_FOLDER = re.compile(
+    r"(?<![\w.~-])(?:/(?:Users|home)/" + _WORD
+    + r"|(?:/mnt/[a-z]|/[a-z])/[Uu]sers/(?:" + _WORDS + r"(?=/)|" + _WORD + r")"
+    + r"|[A-Za-z]:([\\/])\1*[Uu]sers[\\/]+(?:" + _WORDS + r"(?=\1)|" + _WORD + r"))", re.ASCII)
+
+
+def event_value(value, depth=0):
+    """A value as an event carries it: every text that looks like a credential withheld, a home
+    folder written as ~ (no event names the account this machine is signed in as), and every
+    number whole (the two sides print any other number differently, so it travels as text)."""
+    if isinstance(value, str):
+        if has_secret(value):
+            return WITHHELD
+        return HOME_FOLDER.sub("~", value).encode("utf-8", "replace").decode("utf-8")  # no half-characters
+    if value is None or isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return value if abs(value) <= SAFE_INTEGER else str(value)
+    if isinstance(value, float):
+        whole = value == value and abs(value) <= SAFE_INTEGER and value == int(value)
+        return int(value) if whole else str(value)
+    if depth >= 32:
+        return None
+    if isinstance(value, (list, tuple)):
+        return [event_value(item, depth + 1) for item in value]
+    if isinstance(value, dict):
+        out = {}
+        for key, item in value.items():
+            if not isinstance(key, str) or has_secret(key):
+                continue
+            if credential_key(key) and isinstance(item, str) and CREDENTIAL_STRING.match(item):
+                item = WITHHELD  # a key that names a credential, holding a value shaped like one
+            out[key.encode("utf-8", "replace").decode("utf-8")] = event_value(item, depth + 1)
+        return out
+    return None
+
+
+def event_bytes(value):
+    return len(REPORT.canonical_json(value))
+
+
+def fit_event(event):
+    """An event as the outbox keeps it: nothing its schema would refuse. A result over 16 KB is left
+    out, and a payload over 32 KB loses what it can best spare, in order, until it fits; `leftOut`
+    names each key that was."""
+    payload = event_value(event["payload"])
+    left = []
+
+    def over():
+        # Measured as it will be stored: the names of what was left out count toward the limit too.
+        return event_bytes(dict(payload, leftOut=left) if left else payload) > EVENT_PAYLOAD_MAX_BYTES
+
+    if payload.get("result") is not None and event_bytes(payload["result"]) > RESULT_MAX_BYTES:
+        payload["result"] = None
+        left.append("result")
+    facts = (payload.get("observed") or {}).get("conditionFacts")
+    if isinstance(facts, dict) and over():
+        # The facts a condition was decided from are the largest thing a command reads: the lists go first.
+        for key in sorted(facts):
+            if isinstance(facts[key], list):
+                facts[key] = []
+                left.append("observed.conditionFacts.%s" % key)
+    for key, empty in EVENT_SPARE:
+        if not over():
+            break
+        if payload.get(key):
+            if empty is None and key == "observed":
+                del payload[key]
+            else:
+                payload[key] = empty
+            left.append(key)
+    if left:
+        payload["leftOut"] = left
+    return dict(event, payload=payload)
+
+
+def outbox_name(state):
+    """The outbox beside a run's state file: the state's name with `.outbox.json` for `.json`."""
+    return state_name(state["sessionId"], state["item"], state["runId"])[:-len(".json")] + OUTBOX_SUFFIX
+
+
+def outbox_data(box):
+    return (json.dumps(box, separators=(",", ":"), sort_keys=True) + "\n").encode("utf-8")
+
+
+def read_outbox(path, world):
+    """The unsent history an outbox file keeps, or None when there is none this runner wrote:
+    {"runId", "sessionId", "item", "repository", "events", and "definition" while the run's first
+    event is still in it}. Read as a state file is: a small regular file this user owns, never a link."""
+    try:
+        fd = os.open(path, os_flags("O_RDONLY", "O_NONBLOCK", "O_NOFOLLOW"))
+    except OSError:
+        return None
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != world.uid or info.st_size > OUTBOX_MAX_BYTES:
+            return None
+        parts = []
+        while True:
+            part = os.read(fd, 1 << 20)
+            if not part:
+                break
+            parts.append(part)
+        box = json.loads(b"".join(parts).decode("utf-8"))
+    except (OSError, ValueError, RecursionError):
+        return None
+    finally:
+        os.close(fd)
+    events = box.get("events") if isinstance(box, dict) else None
+    if (not isinstance(events, list) or not isinstance(box.get("runId"), str) or not RUN_ID.match(box["runId"])
+            or not isinstance(box.get("sessionId"), str) or not SESSION.match(box["sessionId"])
+            or not all(isinstance(event, dict) and _whole(event.get("clientSequence")) and isinstance(event.get("type"), str)
+                       for event in events)):
+        return None
+    return box
+
+
+def set_aside(world, folder, box):
+    """An earlier run of the same session and item, over or replaced, whose history DevStride does not
+    hold yet: kept under its own run id, where a later command sends it (send_left_behind)."""
+    if box["events"]:
+        write_file(folder, "%s.%s%s" % (box["sessionId"], box["runId"], OUTBOX_SUFFIX), outbox_data(box))
+
+
+def adopted_outbox(folder, state):
+    """The outbox of the session a run was adopted from: named by that session and the run, whatever
+    name its state file was kept under."""
+    return os.path.join(folder, outbox_name(dict(state, sessionId=state["adoptedFrom"]["sessionId"])))
+
+
+def keep_history(world, folder, run, answer, old_path=None):
+    """Add what this command journaled to the run's outbox, before its state is written: a command
+    that dies between the two leaves events the next command drops, never a state that counts
+    events nobody kept. `old_path`: the state file of the session a run was adopted from, whose
+    outbox this one carries on from."""
+    state = run.state
+    name = outbox_name(state)
+    path = os.path.join(folder, name)
+    try:
+        box = read_outbox(path, world)
+        if box is not None and box["runId"] != state["runId"]:
+            set_aside(world, folder, box)
+            box = None
+        if old_path:
+            box = read_outbox(adopted_outbox(folder, state), world)
+            box = box if box is not None and box["runId"] == state["runId"] else None
+        held = box["events"] if box else []
+        events = [event for event in held if event["clientSequence"] <= run.kept]
+        if run.journal and run.observed:
+            run.journal[0]["payload"]["observed"] = run.observed  # what the command read, on its first event
+        events += [fit_event(event) for event in run.journal]
+        if not events:
+            if os.path.lexists(path):
+                os.unlink(path)
+            return
+        if not run.journal and not old_path and len(events) == len(held):
+            os.utime(path, None)  # nothing new: the file only stays as young as its state
+            return
+        if "historyOrg" not in state:
+            # No fetch named one: read once a run, when its history is first kept, from this machine's key.
+            state["historyOrg"] = state.get("organizationId") or world.organization(state["context"].get("cwd"))
+        kept = {"runId": state["runId"], "sessionId": state["sessionId"], "item": state["item"],
+                "repository": state["context"].get("repository"), "org": state["historyOrg"], "events": events}
+        if events[0]["clientSequence"] == 1:
+            kept["definition"] = state["definition"]
+        data = outbox_data(kept)
+        if len(data) > OUTBOX_MAX_BYTES:
+            # Full: what is kept stays, this command's events are not added, and the run keeps no more.
+            state["eventSeq"], state["historyStopped"] = run.kept, "outbox-full"
+            answer["say"] = HISTORY_STOPPED["outbox-full"]
+            return
+        write_file(folder, name, data)
+    except Exception:
+        # History never fails a command. What this command journaled is lost, and the count goes
+        # back, so the events that follow are numbered on from what the outbox really holds.
+        state["eventSeq"] = run.kept
+
+
+def commit(world, folder, run, answer, old_path=None):
+    """Write what one command decided, in the one order that loses nothing: its events into the
+    outbox, then its state, then one bounded try at sending the history DevStride does not hold
+    yet. An adopted run's old files go once the new ones are written."""
+    keep_history(world, folder, run, answer, old_path)
+    write_state(folder, run.state)
+    if old_path:
+        for stale in (old_path, adopted_outbox(folder, run.state)):
+            if os.path.lexists(stale):
+                os.unlink(stale)
+    send_history(world, folder, run.state, answer)
+
+
+def other_organization(world, cwd, box):
+    """True when an outbox was kept for one organization and this checkout's key now signs in to
+    another (or to none): one organization's history is never sent to another."""
+    owner = box.get("org")
+    return isinstance(owner, str) and bool(owner) and world.organization(cwd) != owner
+
+
+def deliver(world, cwd, box, definition, deadline):
+    """Send one outbox's events in order, in batches. Returns (word, through): `through` is the last
+    event DevStride is known to hold (0: none known); the word is `sent` (all of it), `later` (this
+    command's time ran out, the rest goes with the next), `failed` (not reaching DevStride this
+    time), or `history-full` or `gap` (this run's history can take no more)."""
+    events, through = list(box["events"]), 0
+    if other_organization(world, cwd, box):
+        return "failed", through
+    machine = world.machine()
+    uploaded = defined = False
+    for _ in range(2 * (len(events) // EVENT_BATCH) + 8):  # every round but two makes progress: never a loop
+        if not events:
+            return "sent", through
+        left = deadline - time.monotonic()
+        if left < SEND_LEAST_SECONDS:
+            return "later", through
+        batch, size = [], 0
+        for event in events[:EVENT_BATCH]:
+            size += len(json.dumps(event))
+            if batch and size > BATCH_MAX_BYTES:
+                break
+            batch.append(event)
+        arguments = {"runId": box["runId"], "sessionId": box["sessionId"], "events": batch}
+        if box.get("item"):
+            arguments["itemNumber"] = box["item"]
+        if box.get("repository"):
+            arguments["repository"] = box["repository"]
+        if machine:
+            arguments["machine"] = machine[:200]
+        if (batch[0]["clientSequence"] == 1 or defined) and isinstance(definition, dict):
+            arguments["definition"] = definition
+        try:
+            answer = world.send(RECORD_TOOL, arguments, cwd, min(SEND_SECONDS, left))
+        except Exception:
+            return "failed", through
+        outcome = answer.get("outcome") if isinstance(answer, dict) else None
+        if outcome == "CATALOG_REQUIRED" and not uploaded:
+            # DevStride does not hold this plugin's step contracts yet: sent once, then the same batch again.
+            uploaded = True
+            try:
+                world.send(CATALOG_TOOL, {"catalog": CATALOG_DOCUMENT, "pluginVersion": CLAIMS.plugin_version(PLUGIN_ROOT) or "0.0.0"},
+                           cwd, max(deadline - time.monotonic(), SEND_LEAST_SECONDS))
+            except Exception:
+                return "failed", through
+            continue
+        if outcome == "DEFINITION_REQUIRED" and not defined and "definition" not in arguments and isinstance(definition, dict):
+            defined = True
+            continue
+        if outcome == "HISTORY_FULL":
+            return "history-full", through
+        if outcome == "OUT_OF_ORDER" and _whole(answer.get("expectedClientSequence")):
+            # DevStride already holds everything below the event it expects: that goes, the rest is sent from there.
+            expected = answer["expectedClientSequence"]
+            rest = [event for event in events if event["clientSequence"] >= expected]
+            if (rest and rest[0]["clientSequence"] != expected) or (not rest and expected != events[-1]["clientSequence"] + 1):
+                return "gap", max(through, min(expected - 1, events[-1]["clientSequence"]))  # it expects one this machine no longer holds
+            if len(rest) == len(events):
+                return "failed", through
+            through, events = max(through, expected - 1), rest
+            continue
+        accepted = answer.get("acceptedThrough") if isinstance(answer, dict) and outcome is None else None
+        if not _whole(accepted) or accepted < batch[-1]["clientSequence"]:
+            return "failed", through  # not this tool's answer, or one that did not take the batch
+        through = max(through, accepted)
+        events = [event for event in events if event["clientSequence"] > through]
+    return ("sent", through) if not events else ("failed", through)
+
+
+def drop_sent(world, folder, name, run_id, through):
+    """Take what DevStride now holds out of an outbox, read again from the file: never a copy made
+    before the send, so nothing added meanwhile is lost."""
+    path = os.path.join(folder, name)
+    box = read_outbox(path, world)
+    if through <= 0 or box is None or box["runId"] != run_id:
+        return
+    rest = [event for event in box["events"] if event["clientSequence"] > through]
+    if not rest:
+        os.unlink(path)
+    elif len(rest) != len(box["events"]):
+        box["events"] = rest
+        if rest[0]["clientSequence"] != 1:
+            box.pop("definition", None)
+        write_file(folder, name, outbox_data(box))
+
+
+def send_history(world, folder, state, answer):
+    """One bounded try at sending the run's unsent history, oldest first; then, when all of it went
+    through, what ended runs left behind. A failure keeps the outbox, is not tried again for a
+    minute, and is told to the person once a run (`say`). It never raises: the run carries on."""
+    try:
+        # A full outbox keeps no more, yet what it holds is still owed; a history DevStride can take
+        # no more of (history-full, gap) is sent no more.
+        if state.get("historyStopped") not in (None, "outbox-full") or not state.get("eventSeq"):
+            return
+        if history_off(world, state["context"].get("cwd")):
+            return  # switched off since: what waits is neither sent nor added to
+        name = outbox_name(state)
+        box = read_outbox(os.path.join(folder, name), world)
+        if box is None or box["runId"] != state["runId"] or not box["events"]:
+            return
+        now = epoch_of(world.now())
+        now = time.time() if now is None else now
+        until = epoch_of(state.get("sendAfter"))
+        if until is not None and now < until:
+            return  # the last try failed less than a minute ago
+        deadline = time.monotonic() + SEND_SECONDS
+        word, through = deliver(world, state["context"].get("cwd"), box, state["definition"], deadline)
+        before = (state.get("sendAfter"), state.get("historySaid"), state.get("historyStopped"))
+        if word in HISTORY_STOPPED:
+            os.unlink(os.path.join(folder, name))  # what is left can never be taken
+            state["historyStopped"] = word
+            answer["say"] = HISTORY_STOPPED[word]
+        else:
+            drop_sent(world, folder, name, state["runId"], through)
+        if word == "failed":
+            state["sendAfter"] = stamp(now + SEND_SKIP_SECONDS)
+            if not state.get("historySaid"):
+                state["historySaid"] = True
+                answer["say"] = HISTORY_LINE
+        else:
+            state.pop("sendAfter", None)
+        if before != (state.get("sendAfter"), state.get("historySaid"), state.get("historyStopped")):
+            # What became of the send is added to the state this command just wrote, and only to that
+            # one: a state another command has written since is never put back.
+            held = read_state(os.path.join(folder, state_name(state["sessionId"], state["item"], state["runId"])), world)
+            if held.get("runId") == state["runId"] and held.get("seq") == state["seq"]:
+                store_state(folder, state)
+        if word == "sent":
+            send_left_behind(world, folder, state, deadline)
+    except Exception:
+        pass  # history is never a reason to fail a command
+
+
+def send_left_behind(world, folder, state, deadline):
+    """DevStride was just reached, so the unsent history of runs that are over goes too, oldest first,
+    a few each command, inside the same time limit. Only a run that has ended (its last event says
+    how), so a session still driving one is never raced; only this user's; only one of the same
+    repository (with none: of the same session); and never one kept for another organization than the
+    one this checkout's key signs in to."""
+    own, mine, found = outbox_name(state), state["context"].get("repository"), []
+    for name in os.listdir(folder):
+        if name.endswith(OUTBOX_SUFFIX) and not name.startswith(".") and name != own:
+            try:
+                found.append((os.lstat(os.path.join(folder, name)).st_mtime, name))
+            except OSError:
+                continue
+    sent = 0
+    for _, name in sorted(found):
+        if sent >= LEFT_BEHIND_MAX or deadline - time.monotonic() < SEND_LEAST_SECONDS:
+            break
+        path = os.path.join(folder, name)
+        box = read_outbox(path, world)
+        if (box is None or not box["events"] or box["events"][-1]["type"] != "run-finished"
+                or box.get("repository") != mine or (mine is None and box["sessionId"] != state["sessionId"])
+                or other_organization(world, state["context"].get("cwd"), box)
+                or (_whole(box.get("tries")) and box["tries"] >= LEFT_BEHIND_TRIES)):
+            continue
+        word, through = deliver(world, state["context"].get("cwd"), box, box.get("definition"), deadline)
+        if word in HISTORY_STOPPED:
+            os.unlink(path)
+        else:
+            drop_sent(world, folder, name, box["runId"], through)
+        if word == "failed":
+            again = read_outbox(path, world)
+            if again is not None and again["runId"] == box["runId"]:
+                again["tries"] = (again["tries"] if _whole(again.get("tries")) else 0) + 1
+                write_file(folder, name, outbox_data(again))
+        if word in ("failed", "later"):
+            break
+        sent += 1
+
+
+def unsent_history(world, folder):
+    """Every run of this user on this machine whose history DevStride does not hold yet, oldest first.
+    Read-only."""
+    found = []
+    for name in sorted(os.listdir(folder)):
+        if not name.endswith(OUTBOX_SUFFIX) or name.startswith("."):
+            continue
+        box = read_outbox(os.path.join(folder, name), world)
+        if box is None or not box["events"]:
+            continue
+        found.append({"runId": box["runId"], "sessionId": box["sessionId"], "item": box.get("item"),
+                      "events": len(box["events"]), "since": str(box["events"][0].get("occurredAt")),
+                      "ended": box["events"][-1]["type"] == "run-finished"})
+    return sorted(found, key=lambda entry: (entry["since"], entry["runId"]))
 
 
 # --- an approval gate ------------------------------------------------------------------------------
@@ -1853,33 +2470,138 @@ def dig(value, keys):
 
 
 class Run:
-    """One run's state plus what this command has to report about it."""
+    """One run's state plus what this command adds to its history."""
 
-    def __init__(self, state, contracts, world):
+    def __init__(self, state, contracts, world, command="status"):
         self.state, self.contracts, self.world = state, contracts, world
         self.steps = flat_steps(state["definition"])
-        self.events = []        # step reports, in the order they happened
-        self.closing = None     # the run's end as the tracker is told it
-        self.resend_definition = False
+        self.command = command  # the command this run is driven by, named on every event it journals
+        self.journal = []       # this command's events, one per change, in the order they happened
+        self.observed = {}      # what this command read from the machine, each written where it was read
+        self.base = state["seq"]                  # the state writes before this command: its number is one more
+        self.kept = state.get("eventSeq") or 0    # the last event an earlier command journaled
+        self.keeping = None     # whether the run keeps a history: decided once, at the first event
+        self.stop_event = None  # the run-stopped event of this command, which its call site may add to
         self.commit = None      # the commit HEAD is on, read once per command
         self.facts = {}         # what this command was told for deciding conditions (facts_of)
         self.decided = []       # steps this command answered from the repository's config (config_skip)
         self.config = MISSING   # .claude/ds-config.json of the run's checkout, read once per command
+
+    # -- the history --
+
+    def keeps_history(self):
+        """False with the switch off, and for a run whose history DevStride or this machine can hold no more of."""
+        if self.keeping is None:
+            self.keeping = (not self.state.get("historyStopped") and self.kept < EVENT_SEQ_MAX - 1
+                            and not history_off(self.world, self.state["context"].get("cwd")))
+        return self.keeping
+
+    def emit(self, kind, payload, index=None, actor="agent"):
+        """One event for one change, journaled in order. The event comes back whether or not the run
+        keeps a history, so its call site may add to it until the command is written."""
+        event = {"type": kind, "occurredAt": event_time(self.world.now()), "actor": actor, "payload": payload}
+        if index is not None:
+            event["stepId"] = self.steps[index]["id"]
+            event["attempt"] = min(max(self.record(index)["attempt"], 1), REPORT.MAX_ATTEMPT)
+        if not self.keeps_history():
+            return event
+        if not self.state.get("eventSeq") and kind != "run-started":
+            # A run an earlier plugin started, or one started with the switch off: its history opens here.
+            self.emit("run-started", dict(self.started_payload(), carriedOver=True))
+        self.state["eventSeq"] = (self.state.get("eventSeq") or 0) + 1
+        event["clientSequence"] = self.state["eventSeq"]
+        payload["command"] = {"n": self.base + 1, "name": self.command}
+        self.journal.append(event)
+        return event
+
+    def started_payload(self):
+        """What a run-started event says: the workflow the run pinned and the context it was started
+        with, never a path on this machine."""
+        state, context = self.state, {}
+        for key, value in state["context"].items():
+            if key == "rollup":
+                value = {"verdict": value.get("verdict")} if isinstance(value, dict) else None
+            if key != "cwd":
+                context[key] = value
+        workflow = pinned_workflow(state)
+        version = state.get("pluginVersion")
+        return {"workflow": {"id": str(workflow["id"]), "name": str(workflow["name"]),
+                             "version": workflow["version"] if _whole(workflow["version"]) and workflow["version"] >= 1 else 1,
+                             "hash": workflow["hash"] if isinstance(workflow["hash"], str) and HEX64.match(workflow["hash"]) else state["definitionHash"]},
+                "definitionHash": state["definitionHash"], "catalogHash": catalog_hash(),
+                "pluginVersion": version if isinstance(version, str) and SEMVER.match(version) else "0.0.0",
+                "definitionSource": event_text(state.get("definitionSource"), 200),
+                "fallbackReason": event_text(state.get("fallbackReason"), 200),
+                "builtinId": event_text(state.get("builtinId"), 100),
+                "trackerOutcomes": [word for word in state.get("trackerOutcomes") or [] if isinstance(word, str)][:50],
+                "rehearsal": bool(state.get("rehearsal")), "skillManifest": list(state.get("skillManifest") or [])[:40],
+                "context": context}
+
+    def step_ran(self, index):
+        """What ran a step, as an event names it."""
+        ran = self.record(index).get("ran")
+        if not isinstance(ran, dict) or ran.get("source") not in RUN_SOURCES:
+            return None
+        return dict([("source", ran["source"])] + [(key, event_text(ran.get(key), 200)) for key in ("ref", "version", "hash")
+                                                   if isinstance(ran.get(key), str)])
+
+    def answered(self, index, actor="agent", **more):
+        """The step-answered event for a step's record as it now stands."""
+        record = self.record(index)
+        status = "waiting" if record["status"] == "issued" else record["status"]
+        result = record["result"] if isinstance(record["result"], dict) else None
+        if result and isinstance(result.get("answer"), str):
+            result = dict(result, answer=event_answer(result["answer"]))  # a person's reply, cut and withheld as run-resumed carries it
+        payload = {"verdictLine": event_line(record["verdict"], "No verdict"), "value": None, "class": event_text(record["class"], 100),
+                   "status": status if status in ("done", "failed", "skipped", "waiting", "parked", "open") else "failed",
+                   "continued": bool(record.get("continued")), "evidence": REPORT.clean_evidence(record["evidence"]),
+                   "links": REPORT.clean_links(record["links"]),
+                   "result": result,
+                   "proof": record["proof"] if isinstance(record["proof"], dict) else None,
+                   "recordsOutcome": event_text(record.get("recordsOutcome"), 32)}
+        payload.update(more)
+        return self.emit("step-answered", payload, index, actor)
+
+    def decided_event(self, index, decision, **more):
+        """The step-decided event for a step the runner settled with no worker: what it decided, and
+        the step as that left it (a failed step the run goes on past says so here)."""
+        record = self.record(index)
+        payload = {"decision": decision, "verdictLine": event_line(record["verdict"], decision),
+                   "status": record["status"] if record["status"] in ("done", "failed", "skipped") else "failed",
+                   "class": event_text(record["class"], 100),
+                   "continued": bool(record.get("continued")) or (record["status"] == "failed" and self.continues(index)),
+                   "ran": self.step_ran(index)}
+        payload.update(more)
+        return self.emit("step-decided", payload, index, actor="script")  # no worker ran: the runner decided
+
+    def readable(self, name):
+        """Whether this checkout can read a commit or ref, noted as read."""
+        found = self.world.readable(self.state["context"]["cwd"], name)
+        if isinstance(name, str) and name:
+            self.observed.setdefault("readable", {})[name[:200]] = found
+        return found
+
+    def library_state(self, index, line):
+        """The library skill cache's answer for one manifest line (None: unusable), noted as read."""
+        found = library_check(self.state.get("organizationId"), line)
+        word = "unusable" if found is None else "hit" if found.get("status") == "hit" else "miss"
+        self.observed.setdefault("library", {})[self.steps[index]["id"]] = word
+        return found
 
     def repo_config(self):
         """The run's checkout's .claude/ds-config.json, or None when it cannot be read as an object."""
         if self.config is MISSING:
             self.config = None
             cwd = self.state["context"].get("cwd")
-            if not isinstance(cwd, str) or not cwd:
-                return None  # no checkout named: nothing is decided from config
-            try:
-                with open(os.path.join(cwd, ".claude", "ds-config.json"), "rb") as handle:
-                    data = handle.read(CONFIG_MAX_BYTES + 1)
-                found = json.loads(data.decode("utf-8")) if len(data) <= CONFIG_MAX_BYTES else None
-                self.config = found if isinstance(found, dict) else None
-            except (OSError, ValueError, UnicodeDecodeError, RecursionError):
-                self.config = None
+            if isinstance(cwd, str) and cwd:  # no checkout named: nothing is decided from config
+                try:
+                    with open(os.path.join(checkout_top(cwd) or cwd, ".claude", "ds-config.json"), "rb") as handle:
+                        data = handle.read(CONFIG_MAX_BYTES + 1)
+                    found = json.loads(data.decode("utf-8")) if len(data) <= CONFIG_MAX_BYTES else None
+                    self.config = found if isinstance(found, dict) else None
+                except (OSError, ValueError, UnicodeDecodeError, RecursionError):
+                    self.config = None
+            self.observed["config"] = {"state": "read" if self.config is not None else "unreadable"}
         return self.config
 
     def decide_from_config(self, index):
@@ -1896,11 +2618,13 @@ class Run:
         if payload.get("answer") is not None:
             return False  # a person's answer to this step is the skill's to read, never a config default
         rule = config_skip(entry, self.repo_config(), payload, workflow_of(self.state))
+        at = entry["configSkip"].index(rule) if rule is not None else None
+        self.observed["config"].setdefault("steps", {})[step["id"]] = at  # the rule that matched, or none
         if rule is None:
             return False
         output = "%s: %s\n%s\n```json\n%s\n```\n" % (
             entry["verdict"]["label"], rule["value"], DECIDED_NOTE + rule["evidence"], json.dumps(rule["result"]))
-        self.complete(index, output)
+        self.complete(index, output, config_rule=at)
         record = self.record(index)
         self.decided.append({"stepId": step["id"], "attempt": record["attempt"], "verdict": record["verdict"]})
         return True
@@ -1940,14 +2664,26 @@ class Run:
         """HEAD as a full commit id, read once: every proof this command checks, and the commit a
         merge it issues is handed, are that one commit, whatever lands on the branch meanwhile."""
         if self.commit is None:
-            self.commit = self.world.head(self.state["context"]["cwd"])
+            try:
+                self.commit = self.world.head(self.state["context"]["cwd"])
+            except GitFailed:
+                self.observed["head"] = "unreadable"
+                raise
+            self.observed["head"] = self.commit
         return self.commit
 
     def binding_holds(self, index, proof):
         binding = self.entry(index)["proof"]["binding"]
         if binding == "none":
             return True
-        return binding_holds(binding, proof, self.world, self.state["context"]["cwd"], self.head())
+        seen = self.observed.setdefault("bindings", {})
+        try:
+            holds = binding_holds(binding, proof, self.world, self.state["context"]["cwd"], self.head())
+        except GitFailed:
+            seen[self.steps[index]["id"]] = "unreadable"
+            raise
+        seen[self.steps[index]["id"]] = "holds" if holds else "stale"
+        return holds
 
     def proof_gone(self, index):
         """Why a finished step's proof no longer holds (`superseded` or `stale`), or None."""
@@ -1992,7 +2728,7 @@ class Run:
         wanted = "origin/%s" % self.state["context"].get("workingBase")
         if proof.get("base") != wanted:
             return "the risk check's proof names the base %s; this run screens against %s" % (proof.get("base"), wanted)
-        if not self.world.readable(self.state["context"]["cwd"], wanted):
+        if not self.readable(wanted):
             return "%s cannot be read here, so nothing was screened against it; fetch it, then screen again" % wanted
         return None
 
@@ -2037,7 +2773,7 @@ class Run:
             else:
                 passed = record.get("passed") or {}
                 proof, unreadable = passed.get("proof"), None
-                if proof is not None and not self.world.readable(self.state["context"]["cwd"], (proof or {}).get("head")):
+                if proof is not None and not self.readable((proof or {}).get("head")):
                     # A baseline whose head this checkout cannot read (a force-pushed rebase, another
                     # clone) is never handed as one: the step is told, and screens in full.
                     proof, unreadable = None, True
@@ -2168,9 +2904,10 @@ class Run:
             # and the run cannot go on: it ends interrupted, as a run whose item was finished elsewhere does.
             record.update(status="failed", endedAt=self.world.now(), redo=None, result={"gateId": record["gate"]["id"], "status": status})
             record["class"] = "stop"
+            self.answered(index, "person", gate=self.gate_of(index, status))
             return dict(self.finish("interrupted"), note=GATE_WITHDRAWN % step["id"])
+        # A person's answer is one event of the run's history, as the runner read it: who gave it is DevStride's to fill in.
         if checkpoint:
-            # done or skipped: the tracker wrote the step's report when the person answered.
             value = next(v for v in entry["verdict"]["values"] if v["value"] == {"done": "DONE", "skipped": "SKIPPED"}[status])
             record.update(verdict="%s: %s" % (entry["verdict"]["label"], value["value"]), endedAt=self.world.now(), redo=None,
                           result={"gateId": record["gate"]["id"], "status": status})
@@ -2178,27 +2915,39 @@ class Run:
             record["status"] = "done" if status == "done" else "skipped"
             if status == "done":
                 record.update(doneSeq=state["seq"] + 1, autoRedo=0, refresh=False)
+            self.answered(index, "person", value=value["value"], gate=self.gate_of(index, status))
             return self.advance()
         value = next(v for v in entry["verdict"]["values"] if v["value"] == {"approved": "APPROVED", "changes": "CHANGES",
                                                                               "rejected": "REJECTED"}[status])
         note = gate_note(gate) if value["detail"] != "none" else ""
         verdict = REPORT.clean_verdict("%s: %s %s" % (entry["verdict"]["label"], value["value"], note))
-        # The tracker wrote the step's report when the person answered: the runner sends none for it.
         record.update(verdict=verdict, endedAt=self.world.now(), redo=None, result={"gateId": record["gate"]["id"], "status": status})
         record["class"] = value["class"]
+        exhausted = status == "changes" and record["autoRedo"] + 1 >= entry.get("maxAutoRedo", AUTO_REDO_LIMIT)
         if status == "approved":
             record.update(status="done", doneSeq=state["seq"] + 1, autoRedo=0, refresh=False)
+        elif status == "rejected" or exhausted:
+            record["status"] = "failed"
+        else:
+            record.update(status="done", redo="changes")
+        self.answered(index, "person", value=value["value"], gate=self.gate_of(index, status))
+        if status == "approved":
             return self.advance()
         if status == "rejected":
-            record["status"] = "failed"
             return self.stop("failed", verdict, index)
-        if record["autoRedo"] + 1 >= entry.get("maxAutoRedo", AUTO_REDO_LIMIT):
-            record["status"] = "failed"
+        if exhausted:
             return self.stop("attempts-exhausted", "step %s was sent back for changes on %d attempts; a person decides how "
                              "to go on" % (step["id"], record["attempt"]), index)
-        record.update(status="done", redo="changes")
         return {"action": "address-changes", "runId": state["runId"], "step": self.step_line(index), "note": note,
                 "attempt": record["attempt"] + 1, "then": GATE_CHANGES}
+
+    def gate_of(self, index, status=None):
+        """The gate a step asked a person through, as an event names it; with the person's answer once it is read."""
+        gate = self.record(index).get("gate") or {}
+        named = {"id": event_text(gate.get("id"), 100) or "unknown", "since": event_text(gate.get("since"), 40)}
+        if status:
+            named["status"] = status
+        return named
 
     def claim_step(self):
         """The first finished story claim step, which an adopted parked run asks again first, or None."""
@@ -2248,39 +2997,32 @@ class Run:
 
     # -- transitions --
 
-    def report(self, index):
-        step, record = self.steps[index], self.record(index)
-        waiting = record.get("waiting") if record["status"] == "issued" else None
-        status = "waiting" if waiting else "running" if record["status"] == "issued" else record["status"]
-        if status in PARKED_STATUSES:
-            status = "waiting"  # the tracker's one word for a step that waits, whatever it waits for
-        # Asked of a person (a question, a confirmation, a gate or checkpoint), unless the step waits
-        # inside itself (`wait`), which names what it waits for in its verdict.
-        on_person = status == "waiting" and not waiting
-        # A step repaired by hand is reported as a later attempt: the tracker never changes an
-        # attempt it holds as finished, so the repair would otherwise stay recorded as the failure.
-        attempt = min(max(record["attempt"], 1) + record.get("repairs", 0), REPORT.MAX_ATTEMPT)
-        self.events.append({"step": step["id"], "attempt": attempt, "status": status,
-                            "verdict": waiting or record["verdict"], "evidence": record["evidence"], "links": record["links"],
-                            "startedAt": record["startedAt"], "endedAt": record["endedAt"], "ran": record["ran"],
-                            **({"waitingOn": "person"} if on_person else {})})
-
     def stop(self, kind, reason, index):
+        """The run stops at a step: for a person's answer (it stays open), or as a failure."""
         self.state["current"] = None
         self.state["stopped"] = {"kind": kind, "reason": REPORT.clean_verdict(reason) or kind, "stepId": self.steps[index]["id"]}
-        self.closing = None if kind in OPEN_STOPS else {"outcome": RUN_OUTCOME[kind], "endedAt": self.world.now()}
+        # How the tracker's run table names this stop as an ending: none for a stop that waits for a person.
+        self.stop_event = self.emit("run-stopped", dict(self.state["stopped"],
+                                                        trackerOutcome=None if kind in OPEN_STOPS else RUN_OUTCOME[kind]))
         return self.stopped_answer()
 
     def stopped_answer(self):
         return dict(self.state["stopped"], action="stopped", runId=self.state["runId"])
 
     def finish(self, outcome):
+        """The run is over. How its end is named to the tracker is the one table's and the tracker's own list."""
         self.state["current"] = None
         self.state["outcome"], self.state["endedAt"] = outcome, self.world.now()
         if outcome == "completed":
             self.state["recordedOutcome"] = self.recorded_outcome()
-        self.closing = {"outcome": tracker_outcome(self.state, outcome), "endedAt": self.state["endedAt"]}
-        return self.finished_answer()
+        answer = self.finished_answer()
+        self.emit("run-finished", {
+            "outcome": event_line(outcome, "ended")[:64], "trackerOutcome": tracker_outcome(self.state, outcome),
+            "recordedOutcome": self.state.get("recordedOutcome"),
+            "continuedPastFailures": answer["continuedPastFailures"][:EVENT_LIST_MAX],
+            "openCheckpoints": answer["openCheckpoints"][:EVENT_LIST_MAX],
+            "skippedByCondition": answer["skippedByCondition"][:EVENT_LIST_MAX]})
+        return answer
 
     def recorded_outcome(self):
         """The outcome the latest finished step with a recording verdict named, or None."""
@@ -2344,6 +3086,11 @@ class Run:
             if fact not in self.facts:
                 return None, [fact], None
             known = self.facts[fact]
+            seen = self.observed.setdefault("conditionFacts", {})
+            if known is None and fact in FACT_LISTS:
+                seen["unknown"] = sorted(set(seen.get("unknown", []) + [fact]))  # a list the agent could not know
+            else:
+                seen[fact] = known[:EVENT_FACTS_MAX] if isinstance(known, list) else known
             if known is None:
                 value, unknown = None, fact
             elif name == "item-tag":
@@ -2367,7 +3114,7 @@ class Run:
         record.update(status="skipped", verdict=REPORT.clean_verdict("SKIPPED: %s was false" % self.steps[index]["when"]["condition"]),
                       evidence=[], links={}, startedAt=moment, endedAt=moment, skippedByCondition=True)
         record["class"] = "skipped"
-        self.report(index)
+        self.decided_event(index, "skipped-by-condition")
 
     def issue(self, index, cause):
         """Hand out a step. `cause` names the runner's own reason for a re-issue (None when a
@@ -2411,11 +3158,13 @@ class Run:
                 record.update(attempt=record["attempt"] + 1, status="failed", verdict=REPORT.clean_verdict(reason), evidence=[],
                               links={}, startedAt=moment, endedAt=moment, refresh=False, redo=None)
                 record["class"] = None
-                self.report(index)
+                self.decided_event(index, "payload-missing", missingKey=event_text(str(error.args[0]), 200) or "unknown", ran=None)
             return self.fail_or_stop(index, "failed", reason) or self.advance()
         ref = step["run"]["ref"]
         if step["run"]["source"] == "repo":
             code, found = read_repo_skill(self.world, self.state["context"]["cwd"], ref)
+            self.observed.setdefault("repoSkill", {})[step["id"]] = (
+                {"state": code} if code else {"state": "ok", "version": found["version"], "hash": found["hash"]})
             if code:
                 # The step never ran, so its verdict is the runner's own, outside the contract's grammar.
                 moment = self.world.now()
@@ -2423,7 +3172,7 @@ class Run:
                               evidence=[], links={}, startedAt=moment, endedAt=moment, refresh=False, redo=None,
                               issuedHead=self.commit, ran={"source": "repo", "ref": ref if isinstance(ref, str) else None})
                 record["class"] = None
-                self.report(index)
+                self.decided_event(index, "skill-unusable", code=code)
                 return self.fail_or_stop(index, "failed", "The skill file %s could not be used (%s); fix the file or the workflow, "
                                          "then resume." % (ref, REPO_FAILURES[code])) or self.advance()
             ran = dict((key, found[key]) for key in ("source", "ref", "version", "hash"))
@@ -2452,7 +3201,13 @@ class Run:
         record["class"] = None
         record.pop("gate", None)
         self.state["current"] = {"stepId": step["id"], "attempt": record["attempt"]}
-        self.report(index)
+        issued = {"action": "request-gate" if self.asks_person(index) else "run",
+                  "cause": cause if cause in EVENT_CAUSES else "stale", "autoRedo": record["autoRedo"],
+                  "agent": None if self.asks_person(index) else step_agent(entry, step["run"]["source"]),
+                  "ran": self.step_ran(index), "issuedHead": self.commit, "refresh": refresh, "phase": event_text(step["phase"], 200)}
+        if cause == "superseded":
+            issued["superseded"] = True  # an earlier step it relies on ran again after it; told as stale, and said here
+        self.emit("step-issued", issued, index)
         if self.decide_from_config(index):
             return self.advance()
         return self.handout(index)
@@ -2464,7 +3219,7 @@ class Run:
                 return line
         return None
 
-    def library_failed(self, index, reason, line):
+    def library_failed(self, index, reason, line, code):
         """The failed-step form: recorded failed with the contract's failure line and a plain reason; no built-in runs instead."""
         step, record, entry = self.steps[index], self.record(index), self.entry(index)
         failure = next((value["value"] for value in entry["verdict"]["values"] if value["class"] == "stop"), "FAIL")
@@ -2475,7 +3230,7 @@ class Run:
                       ran={"source": "library", "ref": step["run"]["ref"], "version": str(step["run"]["version"]),
                            "hash": line["hash"] if line else None}, libraryFetches=0)
         record["class"] = None
-        self.report(index)
+        self.decided_event(index, "skill-unusable", code=code)
         return self.fail_or_stop(index, "failed", "The library skill %s version %s for step %s could not be used: %s." % (
             step["run"]["ref"], step["run"]["version"], step["id"], reason)) or self.advance()
 
@@ -2484,19 +3239,20 @@ class Run:
         step, record = self.steps[index], self.record(index)
         line, organization = self.manifest_line(index), self.state.get("organizationId")
         if line is None or not organization:
-            return self.library_failed(index, "the skill is not in this workflow's manifest", line)
+            return self.library_failed(index, "the skill is not in this workflow's manifest", line, "not-in-manifest")
         if line["implements"] != step["contract"]:
-            return self.library_failed(index, "the skill is written for a different kind of step", line)
-        found = library_check(organization, line)
+            return self.library_failed(index, "the skill is written for a different kind of step", line, "other-contract")
+        found = self.library_state(index, line)
         if found is None:
-            return self.library_failed(index, "the saved copy on this machine cannot be read safely", line)
+            return self.library_failed(index, "the saved copy on this machine cannot be read safely", line, "copy-unreadable")
         if found["status"] == "hit":
             # The report carries the version as text, as it does a repository commit.
             ran = {"source": "library", "ref": line["name"], "version": str(line["version"]), "hash": line["hash"]}
             return {"ran": ran, "file": found["path"]}
         tries = record.get("libraryFetches", 0)
         if tries >= LIBRARY_FETCH_TRIES:
-            return self.library_failed(index, "the text could not be fetched or did not match its fingerprint after %d tries" % tries, line)
+            return self.library_failed(index, "the text could not be fetched or did not match its fingerprint after %d tries" % tries,
+                                       line, "text-unavailable")
         record["libraryFetches"] = tries + 1
         expect = dict((key, line[key]) for key in ("name", "version", "hash", "implements"))
         return {"action": "fetch-skill", "runId": self.state["runId"], "stepId": step["id"], "attempt": tries + 1,
@@ -2518,7 +3274,7 @@ class Run:
             step, record = self.steps[index], self.record(index)
             if step["run"]["source"] == "library":
                 line = self.manifest_line(index)
-                found = library_check(state.get("organizationId"), line) if line and state.get("organizationId") else None
+                found = self.library_state(index, line) if line and state.get("organizationId") else None
                 if not found or found["status"] != "hit":
                     # The saved copy no longer verifies: it is fetched again before the step is handed out.
                     state["current"] = None
@@ -2526,8 +3282,7 @@ class Run:
                     return self.issue(index, None)
                 record["libraryFile"] = found["path"]
             self.branch_fault(index, handed_back=True)
-            self.report(index)  # the same running report again: harmless, and a lost one is not lost
-            return self.handout(index)
+            return self.handout(index)  # nothing changed, so the history gains nothing
         if state.get("reclaim"):
             # An adopted run parked at a gate: the story claim is asked again first, so this session holds it.
             return self.issue(self.index_of(state["reclaim"]), "reclaim")
@@ -2538,7 +3293,7 @@ class Run:
                     record.update(status="skipped", verdict="Off", startedAt=self.world.now(), endedAt=self.world.now(),
                                   ran={"source": "off"})
                     record["class"] = "skipped"
-                    self.report(index)
+                    self.decided_event(index, "off")
                 continue
             if self.parked_at(index):
                 return self.gate_parked(index)
@@ -2568,9 +3323,11 @@ class Run:
             return self.issue(index, cause)
         return self.finish("completed")
 
-    def complete(self, index, output):
+    def complete(self, index, output, config_rule=None, repaired=False):
         """Record a step's answer: its verdict, evidence, result and proof, and what that means
-        for the step and the run. Whatever cannot be read as a pass is recorded as a failure."""
+        for the step and the run. Whatever cannot be read as a pass is recorded as a failure.
+        `config_rule`: the config rule that answered it, when the runner did (decide_from_config);
+        `repaired`: the step a stopped run stopped on, reported by hand."""
         state, step, record, entry = self.state, self.steps[index], self.record(index), self.entry(index)
         state["current"], state["stopped"] = None, None
         if state.get("reclaim") == step["id"]:
@@ -2578,13 +3335,17 @@ class Run:
         kept = record.get("answer")  # a step that asks to run again keeps the person's reply (below)
         record.update(endedAt=self.world.now(), answer=None, evidence=[], links={}, redo=None, waiting=None)
         parsed = parse_verdict(entry, output) if isinstance(output, str) else None
+        more = {"repaired": True} if repaired else {}
         if parsed is None:
             record.update(status="failed", verdict="No verdict")
             record["class"] = None
-            if not self.asks_person(index):
-                self.report(index)
-            if self.fail_or_stop(index, "no-verdict", "step %s did not open its answer with a `%s: …` verdict its contract lists" % (
-                    step["id"], entry["verdict"]["label"])):
+            goes_on = self.continues(index)
+            if goes_on:
+                record["continued"] = True  # a non-blocking step: recorded failed, shown, and the run goes on
+            self.answered(index, checks={"binding": "unchecked"}, **more)
+            if not goes_on:
+                self.stop("no-verdict", "step %s did not open its answer with a `%s: …` verdict its contract lists" % (
+                    step["id"], entry["verdict"]["label"]), index)
                 self.may_have_landed(index)
             return
         value, detail = parsed
@@ -2601,15 +3362,18 @@ class Run:
         record["recordsOutcome"] = None
         if kind == "redo:self":
             record["answer"] = kept  # e.g. a deploy approval retried while the deploy is not waiting yet
-        after = None  # (stop kind, reason) once the report is queued
+        after = None  # (stop kind, reason) once the answer is journaled
+        fault, binding, back_to = None, "unchecked", None
         if kind == "continue":
             # The merge rule is asked again here: a step repaired by hand was never issued past it.
             fault = (problem or proof_fault(step["contract"], entry, proof, value, result) or self.merge_refused(index)
                      or self.landed_fault(index, proof or {}) or self.risk_base_fault(index, proof or {}))
             try:
                 holds = fault is not None or self.binding_holds(index, proof)
+                if fault is None and entry["proof"]["binding"] != "none":
+                    binding = "holds" if holds else "mismatch"
             except GitFailed as error:
-                fault, holds = "its proof cannot be checked: %s" % error, True
+                fault, holds, binding = "its proof cannot be checked: %s" % error, True, "unreadable"
             if fault:
                 record["status"] = "failed"
                 after = ("failed" if problem else "proof", "step %s: %s" % (step["id"], fault))
@@ -2638,26 +3402,36 @@ class Run:
             gate, since = self.requested_gate(text)
             if not self.asks_person(index) or gate is None:
                 record["status"] = "failed"
-                after = ("failed", "step %s: %s, so nothing is waited on and nothing goes on unapproved" % (
-                    step["id"], "the request's answer names no gate" if self.asks_person(index) else "only a gate or a checkpoint parks a run"))
+                fault = "the request's answer names no gate" if self.asks_person(index) else "only a gate or a checkpoint parks a run"
+                after = ("failed", "step %s: %s, so nothing is waited on and nothing goes on unapproved" % (step["id"], fault))
             else:
                 # A blocking one parks the run; a non-blocking checkpoint is left open and the run goes on.
                 record.update(status="parked" if self.blocks(index) else "open", gate={"id": gate, "since": since})
+                more["gate"] = self.gate_of(index)
         else:  # redo:self, rewind:<contract> or end:<outcome>
             record["status"] = "done"
             if REWIND_CLASS.match(kind):
-                self.rewind(index, REWIND_CLASS.match(kind).group(1))
-        if not (self.asks_person(index) and record["status"] in ("done", "failed")):
-            # DevStride writes a gate's or a checkpoint's done and failed itself and refuses them from an agent, which would
-            # lose the run's end sent with them: one that could not be requested is told only by the run's end.
-            self.report(index)
+                back_to = REWIND_CLASS.match(kind).group(1)
         if after and after[0] in ("failed", "proof") and self.continues(index):
             after = None  # a non-blocking step: recorded failed, shown, and the run goes on
             record["continued"] = True
+        # The answer is one event, then what it led to: a rewind, a stop or the run's end, each its own.
+        if config_rule is not None:
+            self.decided_event(index, "decided-from-config", configRule=config_rule, evidence=REPORT.clean_evidence(record["evidence"]),
+                               result=record["result"] if isinstance(record["result"], dict) else None)
+        else:
+            checks = {"binding": binding}
+            if problem:
+                checks["resultUnreadable"] = event_text(problem, 200)
+            self.answered(index, value=event_text(value["value"], 200), fault=event_text(fault, 200) if fault else None,
+                          checks=checks, **more)
+        if back_to:
+            self.rewind(index, back_to)
         if after:
             self.stop(after[0], after[1], index)
             if kind == "confirm":
                 self.state["stopped"]["confirm"] = True  # a yes accepts the verdict, a no ends the run
+                self.stop_event["payload"]["confirm"] = True
             self.may_have_landed(index)
         elif END_CLASS.match(kind):
             self.finish(END_CLASS.match(kind).group(1))
@@ -2668,6 +3442,7 @@ class Run:
         Whatever relied on the steps run again is superseded by them (a go-ahead is asked again).
         references/workflow-runner.md, "Going back", says what happens to each kind of step in between."""
         target = self.provider(index, contract)
+        again = []
         for at in range(target, index):
             step, record = self.steps[at], self.record(at)
             if step["run"]["source"] == "off":
@@ -2682,12 +3457,16 @@ class Run:
                 record.pop(key, None)
             if step["when"]["mode"] == "condition":
                 record["redecide"] = True
+            again.append(step["id"])
+        self.emit("run-rewound", {"fromStepId": self.steps[index]["id"], "toStepId": self.steps[target]["id"],
+                                  "contract": event_text(contract, 100), "resetStepIds": again[:EVENT_LIST_MAX]})
 
     def confirm(self, index, text, yes):
         """A person's answer to a confirm verdict. A yes records the verdict as accepted: the step
         is done as it answered, never run again, and its result carries the answer. A no ends the
         run as declined."""
         state, record = self.state, self.record(index)
+        self.emit("run-resumed", {"answer": event_answer(text), "confirm": "yes" if yes else "no"}, actor="person")
         state["stopped"] = None
         record.update(status="done", endedAt=self.world.now(), answer=text, accepted=yes,
                       verdict=REPORT.clean_verdict("%s (%s)" % (record["verdict"], "accepted" if yes else "declined")))
@@ -2696,7 +3475,7 @@ class Run:
             record["result"] = dict(record["result"], answer=text)
             record["passed"] = {"proof": record["proof"], "result": record["result"]}
             record.update(doneSeq=state["seq"] + 1, refresh=False, autoRedo=0)
-        self.report(index)
+        self.answered(index, accepted=yes, checks={"binding": "unchecked"})  # the step as the person's answer left it
         return self.advance() if yes else self.finish(CONFIRM_DECLINED)
 
     def may_have_landed(self, index):
@@ -2705,33 +3484,8 @@ class Run:
         if self.steps[index]["contract"] == "merge@1":
             record = self.record(index)
             self.state["stopped"].update(mayHaveLanded=True, attempt=record["attempt"], commit=record.get("issuedHead"))
-
-    # -- reporting --
-
-    def reports(self):
-        """The argument objects for the tracker's step-recording tool: at most a few step reports
-        each, the definition in the first one of a run, the run's end in the last."""
-        state = self.state
-        size = REPORT.MAX_REPORTS
-        chunks = [self.events[at:at + size] for at in range(0, len(self.events), size)]
-        if not chunks and (self.closing or self.resend_definition):
-            chunks = [[]]
-        objects = []
-        for number, chunk in enumerate(chunks):
-            definition = None
-            if number == 0 and (self.resend_definition or not state["definitionReported"]):
-                definition = state["definition"]
-            closing = self.closing if number == len(chunks) - 1 else None
-            try:
-                objects.append(REPORT.build_report_arguments(
-                    state["runId"], state["sessionId"], chunk, item_number=state["item"],
-                    repository=state["context"].get("repository"), definition=definition,
-                    run=closing, now=self.world.now()))
-            except ValueError:
-                continue  # a report that cannot be shaped is not sent; it never stops the run
-            if definition is not None and not self.resend_definition:
-                state["definitionReported"] = True
-        return objects
+            if self.stop_event:
+                self.stop_event["payload"].update(mayHaveLanded=True, commit=record.get("issuedHead"))
 
 
 # --- the commands ------------------------------------------------------------------------------
@@ -2805,14 +3559,16 @@ def new_record():
             "ran": None, "answer": None, "refresh": False, "redo": None, "issuedHead": None, "passed": None}
 
 
-def close_replaced(old, world):
-    """The report that ends a run another start replaced."""
-    try:
-        return [REPORT.build_report_arguments(
-            old["runId"], old["sessionId"], [], item_number=old["item"], repository=old["context"].get("repository"),
-            run={"outcome": RUN_OUTCOME["interrupted"], "endedAt": world.now()}, now=world.now())]
-    except ValueError:
-        return []
+def end_replaced(world, folder, old, contracts):
+    """A run another start replaced ends as interrupted, and its history says so in its own outbox.
+    A run with no item keeps its own state file, so the session never holds two open runs of the
+    workflow; a run for an item is overwritten by the new one, and its unsent history is set aside
+    under its run id (set_aside), where a later command sends it."""
+    run = Run(old, contracts, world, "start")
+    run.finish("interrupted")
+    keep_history(world, folder, run, {})
+    if not old["item"]:
+        write_state(folder, old)
 
 
 def command_start(world, request, contracts):
@@ -2860,22 +3616,22 @@ def command_start(world, request, contracts):
     if len(opened) > 1:
         raise Refuse("ambiguous-run", "this session has %d open runs of the %s workflow with no item; resume one by its "
                      "run id, or end it (resume with close), before starting another" % (len(opened), definition.get("id")))
-    replaced, ended = [], None
+    ended = None
     if opened:
         old = opened[0]
         if request.get("replace") is not True and "fetched" in request:
             # A run under way keeps the definition it pinned: the answer is where it is, and no notice again.
-            run = Run(old, contracts, world)
+            run = Run(old, contracts, world, "start")
             run.facts = facts_of(request)
             answer = run.advance()
             answer.update(definitionHash=old["definitionHash"], definitionSource=old.get("definitionSource", "builtin"),
-                          workflow=pinned_workflow(old), notice=None, reports=run.reports())
+                          workflow=pinned_workflow(old), notice=None)
             run.tell_decided(answer)
-            write_state(folder, old)
+            commit(world, folder, run, answer)
             return answer
         if request.get("replace") is not True:
             raise Refuse("run-open", "this session already has an open run for %s; resume it, or start with replace" % (item or "no item"))
-        replaced, ended = close_replaced(old, world), old
+        ended = old
     chosen = choose_definition(definition, request.get("fetched", MISSING), trigger, contracts, version, in_work_tree, context,
                                rehearsal=rehearsal, has_item=item is not None)
     builtin_id, definition = definition.get("id"), chosen["definition"]
@@ -2885,7 +3641,7 @@ def command_start(world, request, contracts):
     state = {"stateVersion": 1, "runId": secrets.token_hex(16), "sessionId": session, "item": item,
              "startedAt": world.now(), "endedAt": None, "outcome": None, "pluginVersion": version,
              "definition": definition, "definitionHash": REPORT.definition_hash(definition), "context": context,
-             "seq": 0, "current": None, "stopped": None, "definitionReported": False,
+             "seq": 0, "current": None, "stopped": None, "eventSeq": 0,
              "steps": dict((step["id"], new_record()) for step in steps),
              "definitionSource": chosen["source"], "workflowId": chosen["workflow"]["id"],
              "workflowName": chosen["workflow"]["name"], "workflowVersion": chosen["workflow"]["version"],
@@ -2894,20 +3650,26 @@ def command_start(world, request, contracts):
              "trackerOutcomes": accepted_outcomes(request.get("fetched"))}
     if chosen["organizationId"]:
         state["organizationId"] = chosen["organizationId"]
+    asked = request.get("fetched")
+    if isinstance(asked, dict) and isinstance(asked.get("data"), dict) and "match" in asked["data"]:
+        asked = asked["data"]  # the route's wrapped answer reads the same, as choose_definition reads it
+    asked = asked.get("organizationId") if isinstance(asked, dict) else None
+    if isinstance(asked, str) and asked:
+        state["historyOrg"] = asked  # the organization the agent fetched this run's workflow from owns its history
     if rehearsal:
         state["rehearsal"] = True  # the start asked to run step skills this plugin has not switched on yet
-    run = Run(state, contracts, world)
+    run = Run(state, contracts, world, "start")
     run.facts = facts
+    started = run.emit("run-started", run.started_payload())
+    if ended is not None:
+        started["payload"]["replacedRunId"] = ended["runId"]
     answer = run.advance()
     answer.update(definitionHash=state["definitionHash"], definitionSource=chosen["source"], workflow=pinned_workflow(state),
-                  notice=chosen["notice"], reports=replaced + run.reports())
+                  notice=chosen["notice"])
     run.tell_decided(answer)
-    if ended is not None and not item:
-        # The replaced run has a file of its own (a run for an item is overwritten below): it is
-        # ended there first, so the session never holds two open runs of the workflow.
-        ended.update(outcome="interrupted", endedAt=world.now(), current=None)
-        write_state(folder, ended)
-    write_state(folder, state)
+    if ended is not None:
+        end_replaced(world, folder, ended, contracts)  # only now: a start that is refused ends nothing
+    commit(world, folder, run, answer)
     return answer
 
 
@@ -2927,19 +3689,18 @@ def workflow_line(state):
 
 def command_next(world, request, contracts):
     folder, state = find_run(world, request, session_of(request, world))
-    run = Run(state, contracts, world)
+    run = Run(state, contracts, world, "next")
     run.facts = facts_of(request)
     # gateAnswer: the person's answer to the gate the run is parked at, as get_workflow_gate read it.
     answer = run.answer_gate(request["gateAnswer"]) if "gateAnswer" in request else run.advance()
-    answer["reports"] = run.reports()
     run.tell_decided(answer)
-    write_state(folder, state)
+    commit(world, folder, run, answer)
     return answer
 
 
 def command_done(world, request, contracts):
     folder, state = find_run(world, request, session_of(request, world))
-    run = Run(state, contracts, world)
+    run = Run(state, contracts, world, "done")
     step_id, attempt = request.get("stepId"), request.get("attempt")
     current, stopped = state["current"], state["stopped"]
     if isinstance(attempt, bool) or not isinstance(attempt, int) or not isinstance(step_id, str):
@@ -2960,24 +3721,24 @@ def command_done(world, request, contracts):
                          "report %s: REQUESTED or %s: UNAVAILABLE, then read the answer with get_workflow_gate "
                          "and pass it to next as gateAnswer" % (step_id, "a checkpoint" if run.is_checkpoint(index) else "an approval gate",
                                                                label, label))
-    if repaired and not issued:
-        run.record(index)["repairs"] = run.record(index).get("repairs", 0) + 1
     run.facts = facts_of(request)
-    run.complete(index, request.get("output"))
+    # A step repaired by hand keeps its attempt number here; its event says it was repaired, and the
+    # tracker, which never changes an attempt it holds as finished, shows the repair as the next one.
+    run.complete(index, request.get("output"), repaired=repaired and not issued)
     record = run.record(index)
     recorded = {"stepId": step_id, "attempt": attempt, "verdict": record["verdict"], "class": record["class"], "status": record["status"]}
     answer = run.advance()
-    answer.update(recorded=recorded, reports=run.reports())
+    answer.update(recorded=recorded)
     run.tell_decided(answer)
-    write_state(folder, state)
+    commit(world, folder, run, answer)
     return answer
 
 
 def command_wait(world, request, contracts):
     """The issued step says it is waiting inside itself (a queue, a deploy, another release): it
-    is reported `waiting` with the reason until its `done`. Nothing else about the run changes."""
+    is shown `waiting` with the reason until its `done`. Nothing else about the run changes."""
     folder, state = find_run(world, request, session_of(request, world))
-    run = Run(state, contracts, world)
+    run = Run(state, contracts, world, "wait")
     step_id, attempt, reason = request.get("stepId"), request.get("attempt"), request.get("reason", "Waiting")
     if isinstance(attempt, bool) or not isinstance(attempt, int) or not isinstance(step_id, str):
         raise Refuse("bad-request", "wait names the step (stepId) and its attempt (a whole number)")
@@ -2992,9 +3753,9 @@ def command_wait(world, request, contracts):
                      "wait is for a step that waits inside itself" % step_id)
     reason = WITHHELD if has_secret(reason) else REPORT.clean_verdict(reason)
     run.record(index)["waiting"] = reason
-    run.report(index)
-    answer = {"runId": state["runId"], "waiting": {"stepId": step_id, "attempt": attempt, "reason": reason}, "reports": run.reports()}
-    write_state(folder, state)
+    run.emit("step-waiting", {"reason": reason}, index)
+    answer = {"runId": state["runId"], "waiting": {"stepId": step_id, "attempt": attempt, "reason": reason}}
+    commit(world, folder, run, answer)
     return answer
 
 
@@ -3033,12 +3794,15 @@ def command_status_all(world, request):
     """This session's unfinished runs, oldest first. Read-only. With `others` true, also the
     unfinished runs other sessions left in this checkout (`cwd`), which a new session adopts by
     their run ids: it never sees them otherwise. A run in another checkout of the repository is
-    another session's live work, never listed here."""
+    another session's live work, never listed here. With `unsent` true, also every run of this
+    user on this machine whose history DevStride does not hold yet (unsent_history)."""
     session, folder = session_of(request, world), state_dir(world, create=False)
-    others = request.get("others", False)
+    others, unsent = request.get("others", False), request.get("unsent", False)
     cwd = request.get("cwd", os.getcwd())
     if not isinstance(others, bool) or (others and not (isinstance(cwd, str) and os.path.isdir(cwd))):
         raise Refuse("bad-request", "others is true or false, and cwd must be a directory")
+    if not isinstance(unsent, bool):
+        raise Refuse("bad-request", "unsent is true or false")
     runs, left = [], []
     for state in (own_states(world, folder) if folder else []):
         if state["outcome"]:
@@ -3053,10 +3817,13 @@ def command_status_all(world, request):
         elif others and os.path.realpath(str(state["context"].get("cwd") or "")) == os.path.realpath(cwd):
             left.append(dict(row, sessionId=state["sessionId"]))
     runs.sort(key=lambda run: (str(run["startedAt"]), run["runId"]))
-    if not others:
-        return {"runs": runs}
-    left.sort(key=lambda run: (str(run["startedAt"]), run["runId"]))
-    return {"runs": runs, "others": left}
+    answer = {"runs": runs}
+    if others:
+        left.sort(key=lambda run: (str(run["startedAt"]), run["runId"]))
+        answer["others"] = left
+    if unsent:
+        answer["unsent"] = unsent_history(world, folder) if folder else []
+    return answer
 
 
 def command_status(world, request, contracts):
@@ -3064,11 +3831,11 @@ def command_status(world, request, contracts):
         if request["all"] is not True or request.get("item") is not None or request.get("runId") is not None:
             raise Refuse("bad-request", "all is only ever true, and it names no run")
         return command_status_all(world, request)
-    if "others" in request:
-        raise Refuse("bad-request", "others goes only with all")
+    if "others" in request or "unsent" in request:
+        raise Refuse("bad-request", "others and unsent go only with all")
     if "evidence" in request and not isinstance(request["evidence"], bool):
         raise Refuse("bad-request", "evidence is true or false")
-    _, state = find_run(world, request, session_of(request, world))
+    folder, state = find_run(world, request, session_of(request, world))
     run = Run(state, contracts, world)
     rows = [{"stepId": step["id"], "phase": step["phase"], "name": step["name"],
              "status": "waiting" if run.record(index)["status"] == "issued" and run.record(index).get("waiting") else run.record(index)["status"],
@@ -3088,40 +3855,26 @@ def command_status(world, request, contracts):
         table.append("| %s | %s | %s | %s | %s |" % tuple(
             str(cell if cell is not None else "").replace("|", "\\|")
             for cell in (row["phase"], row["name"], row["status"], row["verdict"], row["attempt"] or "")))
-    if request.get("includeDefinition") is True:
-        run.resend_definition = True
     source = "organization" if state.get("definitionSource") == "organization" else "builtin"
+    box = read_outbox(os.path.join(folder, outbox_name(state)), world)
+    waiting = len(box["events"]) if box and box["runId"] == state["runId"] else 0
     return {"runId": state["runId"], "state": run_state(state),
             "position": position, "rows": rows, "table": "\n".join(table), "workflow": workflow_line(state),
             "parkedAt": parked_at(state),
             "definitionSource": source,
             "source": SOURCE_LABELS.get(None if source == "organization" else state.get("fallbackReason") or "not-fetched", "built-in"),
-            "reports": run.reports()}
-
-
-def replay_reports(state, contracts, world):
-    """Everything a run has to say, shaped again from its state: each step that has started, the
-    definition, and the run's end. The tracker keeps what it already holds, so sending it twice
-    changes nothing."""
-    run = Run(state, contracts, world)
-    for index in range(len(run.steps)):
-        status = run.record(index)["status"]
-        if status != "pending" and not (run.asks_person(index) and status in ("done", "failed")):
-            # As `complete`: a gate's or a checkpoint's done and failed are the tracker's own to
-            # write, and an agent's would get the batch carrying the run's end refused.
-            run.report(index)
-    run.resend_definition = True
-    ended = state["outcome"] or (state["stopped"] or {}).get("kind")
-    if ended and not (not state["outcome"] and ended in OPEN_STOPS):
-        run.closing = {"outcome": tracker_outcome(state, ended), "endedAt": state.get("endedAt") or world.now()}
-    return run.reports()
+            # The run's history: how many events were journaled, how many DevStride does not hold yet,
+            # why none is kept any more (a full history or outbox), when that is so, and whether it is
+            # switched off.
+            "history": {"events": state.get("eventSeq") or 0, "unsent": waiting, "stopped": state.get("historyStopped"),
+                        "off": history_off(world, state["context"].get("cwd"))}}
 
 
 def own_states(world, folder):
     """Every run state in the folder that this runner wrote for this user, with its file name."""
     found = []
     for name in sorted(os.listdir(folder)):
-        if name.startswith(".") or not name.endswith(".json"):
+        if not is_state_name(name):
             continue
         try:
             state = read_state(os.path.join(folder, name), world)
@@ -3131,62 +3884,6 @@ def own_states(world, folder):
         if named:
             found.append(state)
     return found
-
-
-def command_reported(world, request, contracts):
-    """What became of a run's reports: `ok: false` once they fail (the run is then marked as having
-    unsent reports, and the first such call hands back the one line to say), `ok: true` once a
-    replay went through. A run named by its id may be another session's: a replay sends those too.
-    The mark is cleared only once the run has ended: a run that is merely stopped may go on in a
-    session that has given up reporting it, so it is replayed again until it ends."""
-    good, run_id = request.get("ok"), request.get("runId")
-    if not isinstance(good, bool):
-        raise Refuse("bad-request", "reported says ok: true or false")
-    if run_id is not None and not (isinstance(run_id, str) and RUN_ID.match(run_id)):
-        raise Refuse("bad-request", "runId is 32 lower-case hex characters")
-    folder = state_dir(world, create=False)
-    if run_id and folder:
-        states = [state for state in own_states(world, folder) if state["runId"] == run_id]
-        if len(states) != 1:
-            raise Refuse("no-run", "there is no such run on this machine")
-        state = states[0]
-    else:
-        folder, state = find_run(world, request, session_of(request, world))
-    first = not good and not state.get("reportsUnsent")
-    if good and state["outcome"]:
-        state.pop("reportsUnsent", None)
-    elif first:
-        state["reportsUnsent"] = world.now()
-    if first or (good and state["outcome"]):
-        if not state["item"]:
-            settle_legacy(folder, state["sessionId"], world)  # one an earlier plugin kept: moved first, never written twice
-        write_state(folder, state)  # a stopped run's replay writes nothing: its file is not kept alive by it
-    return {"runId": state["runId"], "unsent": bool(state.get("reportsUnsent")), "say": UNSENT_LINE if first else None}
-
-
-def command_unsent(world, request, contracts):
-    """The runs on this machine, of this repository, that are over (ended, or stopped) and whose
-    reports did not reach the tracker, each with its reports shaped again in full. A run still
-    going is never handed out: its own session is driving it. Read-only: `reported` with
-    `ok: true` clears an ended one."""
-    cwd = request.get("cwd", os.getcwd())
-    if not isinstance(cwd, str) or not os.path.isdir(cwd):
-        raise Refuse("bad-request", "cwd must be a directory")
-    cwd, folder, runs = os.path.realpath(cwd), state_dir(world, create=False), []
-    for state in (own_states(world, folder) if folder else []):
-        if not (state.get("reportsUnsent") and (state["outcome"] or state["stopped"]) and same_repository(world, state, cwd)):
-            continue
-        try:
-            reports = replay_reports(state, contracts, world)
-        except (KeyError, TypeError, ValueError, AttributeError):
-            continue  # a state this runner cannot shape again is left for a person
-        if reports:
-            runs.append({"runId": state["runId"], "item": state["item"], "sessionId": state["sessionId"],
-                         "since": str(state["reportsUnsent"]), "reports": reports, "ended": bool(state["outcome"])})
-    # Ended runs first (a replay clears them), then stopped ones: ten stopped runs never crowd out
-    # a finished one.
-    runs.sort(key=lambda run: (not run.pop("ended"), run["since"]))
-    return {"runs": runs[:UNSENT_MAX_RUNS], "more": max(0, len(runs) - UNSENT_MAX_RUNS)}
 
 
 def judge_run(run, definition):
@@ -3288,7 +3985,7 @@ def adopt(world, request, session, cwd):
         raise Refuse("no-run", "there is no unfinished run to resume")
     found, elsewhere = [], 0
     for name in os.listdir(folder):
-        if not name.endswith(".%s.json" % item if item else ".json") or name.startswith("."):
+        if not name.endswith(".%s.json" % item if item else ".json") or not is_state_name(name):
             continue
         path = os.path.join(folder, name)
         try:
@@ -3320,7 +4017,6 @@ def adopt(world, request, session, cwd):
     adopted_from = {"sessionId": state["sessionId"], "cwd": state["context"].get("cwd")}
     state["sessionId"] = session
     state["context"]["cwd"] = cwd  # proofs are read in the checkout that carries the run on
-    state["definitionReported"] = False  # the first report after an adoption carries the definition again
     state["adoptedFrom"] = adopted_from  # kept: an adopted run goes on only on its story branch
     return folder, state, adopted_from, old_path
 
@@ -3356,10 +4052,15 @@ def command_resume(world, request, contracts):
             raise
         folder, state, adopted_from, old_path = adopt(world, request, session, cwd)
     prune(folder, world)
-    run = Run(state, contracts, world)
+    run = Run(state, contracts, world, "resume")
     run.facts = facts_of(request)
+    if adopted_from:
+        # The run changes hands: from here on its history is this session's to keep and send.
+        run.emit("run-adopted", {"fromSessionId": event_text(adopted_from["sessionId"], 200), "toSessionId": session,
+                                 "branch": event_text(world.branch(cwd), 300)})
     if request.get("close") is True:
         # A run whose item was finished elsewhere: ended as interrupted, never carried on.
+        run.emit("run-resumed", {"close": True})
         answer = run.finish("interrupted")
     elif (state["stopped"] or {}).get("mayHaveLanded") and "landed" not in request:
         # merge-may-have-landed: answered with the stop until the driver has checked the landing.
@@ -3369,9 +4070,8 @@ def command_resume(world, request, contracts):
     if answer is not None:
         if adopted_from:
             answer["adoptedFrom"] = adopted_from
-        answer["reports"] = run.reports()
         run.tell_decided(answer)
-        write_adopted(folder, state, old_path)
+        commit(world, folder, run, answer, old_path)
         return answer
     at = (state["stopped"] or state["current"] or {}).get("stepId")
     if at and state["stopped"] and answer_text is not None and state["steps"][at]["class"] == "confirm" and state["steps"][at]["status"] == "waiting":
@@ -3382,10 +4082,14 @@ def command_resume(world, request, contracts):
         answer = run.confirm(run.index_of(at), answer_text, said.group(1).lower() == "yes")
         if adopted_from:
             answer["adoptedFrom"] = adopted_from
-        answer["reports"] = run.reports()
         run.tell_decided(answer)
-        write_adopted(folder, state, old_path)
+        commit(world, folder, run, answer, old_path)
         return answer
+    # The run is carried on: one event, the person's when it carries their reply.
+    resumed = {"answer": event_answer(answer_text), "confirm": None}
+    if "landed" in request:
+        resumed["landed"] = False
+    run.emit("run-resumed", resumed, actor="person" if answer_text is not None else "agent")
     if at:
         record = state["steps"][at]
         if state["stopped"]:
@@ -3399,17 +4103,9 @@ def command_resume(world, request, contracts):
     answer = run.advance()
     if adopted_from:
         answer["adoptedFrom"] = adopted_from
-    answer["reports"] = run.reports()
     run.tell_decided(answer)
-    write_adopted(folder, state, old_path)
+    commit(world, folder, run, answer, old_path)
     return answer
-
-
-def write_adopted(folder, state, old_path):
-    """The resumed run's state, written under this session; an adopted run's old file goes."""
-    write_state(folder, state)
-    if old_path and os.path.lexists(old_path):
-        os.unlink(old_path)
 
 
 def command_repository(world, request, contracts):
@@ -3418,9 +4114,7 @@ def command_repository(world, request, contracts):
 
 
 HANDLERS = {"repository": command_repository, "start": command_start, "next": command_next, "done": command_done,
-            "wait": command_wait,
-            "status": command_status, "resume": command_resume, "reported": command_reported,
-            "unsent": command_unsent, "judge": command_judge}
+            "wait": command_wait, "status": command_status, "resume": command_resume, "judge": command_judge}
 
 
 def refuse_stopped(request, world):

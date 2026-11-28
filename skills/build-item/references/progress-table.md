@@ -17,7 +17,7 @@ engine actually registered would have surfaced that in one glance.
 
 The step rows are the runner's own: `workflow.py status` returns them as a ready `table`, one row
 per step of the run by its id, and the loop renders that table with its own rows around it (step
-0, the profile, each engine and matched lens, step 7, step 8, the workflow report).
+0, the profile, each engine and matched lens, step 7, step 8, the run history).
 
 ## The pull-request path shape (develop-base stories and one-offs)
 
@@ -41,7 +41,7 @@ per step of the run by its id, and the loop renders that table with its own rows
 | sync | — |
 | 7 · Close-out | — |
 | 8 · Epic release | n/a — one-off |
-| Workflow report | on (run 3f9c1a) |
+| Run history | on, all sent (run 3f9c1a) |
 ```
 
 ## The fast-path shape — deferred cloud rows stay visible
@@ -55,7 +55,7 @@ per step of the run by its id, and the loop renders that table with its own rows
 | — Configured local review | ✅ 4 findings → 3 fixed, 1 captured |
 | — Copilot + CI | ⏸ deferred to the epic release PR (step 8) |
 | merge | ✅ merged --no-ff → jane/03-14-26/I20104-attachment-storage |
-| Workflow report | on (run 3f9c1a) |
+| Run history | on, all sent (run 3f9c1a) |
 ```
 
 Without the deferred rows, "no Copilot row" is indistinguishable from "Copilot was forgotten".
@@ -77,11 +77,10 @@ Without the deferred rows, "no Copilot row" is indistinguishable from "Copilot w
   told apart from "not reached". The `Profile` row exists because a resumed session re-derives
   the review path and verify width from it.
 - It is a status render, not a gate — it must never delay the step it describes.
-- **The `Workflow report` row** is shown only while reporting is on and the run's last answer was
-  not an error, so a resumed session knows reporting is live; its id is the first six characters
-  of the run's `runId`. Off or unavailable, the row is left out, and a resumed session that finds
-  no row simply forwards its next reports as usual: the gate decides
-  (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/workflow-reports.md`).
+- **The `Run history` row** renders `status`'s `history`: `on, all sent`, `on, N waiting to send`
+  (a later command sends them) or why no more is kept; its id is the first six characters of the
+  run's `runId`; `off` true (switched off), no row. It only shows: the runner sends the history, the driver
+  forwards nothing (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/workflow-reports.md`).
 
 ## Cited by
 

@@ -8,6 +8,11 @@ set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 FAIL=0
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
+# The step runner sends a run's history itself, with this machine's own DevStride key. No test may
+# find one: each runs with a home folder of its own, no key in its environment, and the one
+# address a call could go to set to a port of this machine that nothing listens on.
+export HOME="$WORK/home" XDG_CONFIG_HOME="$WORK/home/.config" DEVSTRIDE_PLUGIN_TEST_URL="http://127.0.0.1:9"; mkdir -p "$HOME"
+unset CLAUDE_CONFIG_DIR DEVSTRIDE_API_KEY DEVSTRIDE_API_SECRET DEVSTRIDE_ORG_ID DEVSTRIDE_ORG_SLUG DEVSTRIDE_BASE_URL
 export PYTHONDONTWRITEBYTECODE=1
 unset CLAUDE_CODE_SESSION_ID CODEX_THREAD_ID XDG_CACHE_HOME GIT_DIR GIT_WORK_TREE
 
@@ -15,6 +20,22 @@ cat > "$WORK/cases.py" <<'PY'
 import copy, json, os, re, subprocess, sys
 
 ROOT, WORK = sys.argv[1], sys.argv[2]
+
+
+def told(answer, cache):
+    """The runner hands out no step reports: it journals one event a transition and sends them
+    itself. Nothing here has a DevStride to send to, so `reports` on an answer below is what that
+    one command journaled, read from the run's outbox by the scenario driver (run_scenarios.py)."""
+    if not TOLD:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("run_scenarios", os.path.join(ROOT, "scripts/tests/run_scenarios.py"))
+        TOLD.append(importlib.util.module_from_spec(spec))
+        spec.loader.exec_module(TOLD[0])
+        TOLD.append({})
+    return TOLD[0].told(answer, cache, TOLD[1])
+
+
+TOLD = []
 RUNNER = os.path.join(ROOT, "skills/run-workflow/scripts/workflow.py")
 NAMER = os.path.join(ROOT, "skills/hotfix-steps/scripts/hotfix-name.py")
 HOTFIX_FILE = os.path.join(ROOT, "workflows/hotfix.json")
@@ -118,7 +139,7 @@ class Run:
         env = dict(os.environ, XDG_CACHE_HOME=self.cache)
         done = subprocess.run([sys.executable, "-B", RUNNER, command], input=json.dumps(dict(request, session="s1")),
                               capture_output=True, text=True, env=env, cwd=self.repo)
-        answer = json.loads(done.stdout) if done.returncode == 0 else None
+        answer = told(json.loads(done.stdout), self.cache) if done.returncode == 0 else None
         if answer is not None:
             self.answers.append(answer)
         return done.returncode, answer, done.stderr
@@ -467,18 +488,15 @@ while run.answer and run.answer.get("action") == "run" and run.answer["step"]["i
 check("... and the merge is handed out again only once every proof is fresh",
       run.answer.get("action") == "run" and run.answer["step"]["id"] == "merge" and ("review", 2) in run.issued(), (run.issued(), run.answer))
 
-# Reporting fails open: every report failing to reach the tracker leaves the run's outcome unchanged.
+# History fails open: with no DevStride to reach, the run says so once and its outcome is unchanged.
 run = Run()
-said = []
 while run.answer and run.answer["action"] == "run":
-    rid = run.answer["runId"]
     run.done()
-    rc, back, _ = run.call("reported", {"ok": False, "runId": rid})
-    said.append(rc == 0 and back is not None)
-    if back is not None:
-        run.answers.pop()
-check("every report failing leaves the run completed, its steps issued once each", all(said) and run.answer.get("action") == "finished"
-      and run.answer.get("outcome") == "completed" and run.issued() == [(s, 1) for s in PINNED], (said, run.answer))
+said = [a["say"] for a in run.answers if a.get("say")]
+kept = [name for name in os.listdir(os.path.join(run.cache, "devstride-plugin", "workflows")) if name.endswith(".outbox.json")]
+check("history that cannot be sent is said once, kept beside the run's state, and leaves the run completed, its steps issued once each",
+      len(said) == 1 and "not reaching DevStride yet" in said[0] and len(kept) == 1 and run.answer.get("action") == "finished"
+      and run.answer.get("outcome") == "completed" and run.issued() == [(s, 1) for s in PINNED], (said, kept, run.answer))
 
 # A refused production merge stops the run before the deploy is approved.
 run = Run()

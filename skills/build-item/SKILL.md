@@ -239,11 +239,10 @@ command, and again after a compaction**: the commands, the answers, the stops an
    `done` with `stepId`, `attempt` and the skill's WHOLE answer as `output`. Its answer is the next
    action. A step already acted on before an interruption (a merge that landed) is reported with
    `done`, never run again.
-4. **Reports.** Forward every `reports` object, in order: **read
-   `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/workflow-reports.md` in full before the
-   first forward of a run, or after a compaction**, and send each exactly as it says, unless
-   `workflows` is `null`: then report nothing. A report never gates, delays or stops a step; a
-   failed one: as that file says.
+4. **History.** The runner sends the run's history to DevStride itself: forward nothing. An
+   answer's `say` is one line to say once
+   (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/workflow-reports.md`); history
+   never gates, delays or stops a step.
 5. **`stopped`**: say the reason plainly and what can be done about that kind of stop. A
    question (`needs-person`), attended → ask it and, once the person replies, `resume` with their
    reply as `answer`; unattended with `needsYou.label` set → `references/needs-you.md`. A red local

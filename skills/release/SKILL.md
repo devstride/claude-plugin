@@ -96,7 +96,7 @@ Optional arguments: $ARGUMENTS
 first runner command, and again after a compaction**: this loop's contract with the runner (its
 commands, answers and step agents). The loop has four duties the runner cannot do.
 
-**A. Run and forward.**
+**A. Run.**
 
 1. **Choose the definition.** A partial word picks its partial definition. Otherwise
    `release.clearance.scope`, read in either provider shape (`provider` or `commands`): absent, a
@@ -114,9 +114,9 @@ commands, answers and step agents). The loop has four duties the runner cannot d
    `${CLAUDE_PLUGIN_ROOT}/workflows/<id>.json` and the context.
 4. **For each `run` answer**: run it where its `agent` says (`step-agents.md`): a step agent, or
    here the named skill with `argument` unchanged, then `done` with its WHOLE answer as `output`.
-5. **Reports**: forward every `reports` object, in order, exactly as
-   `${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/workflow-reports.md` says. Reporting fails
-   open: a failure is one line, never a stop.
+5. **History**: the runner sends the run's history itself: forward nothing; say an answer's
+   `say` once (`${CLAUDE_PLUGIN_ROOT}/skills/build-item/references/workflow-reports.md`). It
+   fails open: one line, never a stop.
 6. **The train claim** (kind `release-train`, `auto-start.md` "The train claim"): while this run
    holds it, heartbeat it at every step transition with `heartbeat.phase` (a step agent's
    `heartbeat` line names it).

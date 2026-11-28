@@ -6,6 +6,11 @@ set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 FAIL=0; ok() { echo "  ok   $1"; }; bad() { echo "  FAIL $1"; FAIL=1; }
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
+# The step runner sends a run's history itself, with this machine's own DevStride key. No test may
+# find one: each runs with a home folder of its own, no key in its environment, and the one
+# address a call could go to set to a port of this machine that nothing listens on.
+export HOME="$WORK/home" XDG_CONFIG_HOME="$WORK/home/.config" DEVSTRIDE_PLUGIN_TEST_URL="http://127.0.0.1:9"; mkdir -p "$HOME"
+unset CLAUDE_CONFIG_DIR DEVSTRIDE_API_KEY DEVSTRIDE_API_SECRET DEVSTRIDE_ORG_ID DEVSTRIDE_ORG_SLUG DEVSTRIDE_BASE_URL
 export PYTHONDONTWRITEBYTECODE=1
 
 # Step skills the catalog names that a later change on this branch adds: none now.
@@ -728,7 +733,7 @@ check("the loop half points at the contracts half, and the Build loop reads the 
       "${CLAUDE_PLUGIN_ROOT}/" + authoring in text
       and re.search(r"Read\s+`\$\{CLAUDE_PLUGIN_ROOT\}/%s` in full" % re.escape(reference),
                     open(os.path.join(root, "skills/build-item/SKILL.md"), encoding="utf-8").read()) is not None)
-SECTIONS = {reference: ["## Commands", "## A step's answer", "## Waiting and parked", "## Going back", "## Counting a step's re-issues", "## Stops", "## Reporting", "## Heartbeat and ship intent", "## Resuming", "## Cited by"],
+SECTIONS = {reference: ["## Commands", "## A step's answer", "## Waiting and parked", "## Going back", "## Counting a step's re-issues", "## Stops", "## History", "## Heartbeat and ship intent", "## Resuming", "## Cited by"],
             authoring: ["## What `start` refuses", "## What is reported", "## Payloads", "## Proofs",
                         "## satisfiedBy — one step standing in for another's proof", "## Cited by"]}
 check("every section of the reference before the split is in exactly one half",

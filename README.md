@@ -268,13 +268,17 @@ the session runs a DevStride skill.
 
 The contract is `skills/setup/references/session-presence.md`.
 
-**Step reports.** While `build-item` builds a story in a session connected to DevStride, it also
-reports which step of its workflow it is on and what each step produced: a one-line verdict, a
-few lines of evidence (counts, commands, a short commit id) and the links it already holds, with
-the repository's name as `host/owner/name`. **Never** session text, a prompt or a file's content.
+**Run history.** While a workflow runs (a story's build, a plan, a release, a hotfix), the step
+runner keeps a history of it and sends it to DevStride itself, with the machine's own DevStride
+key: each step handed out, answered or waiting, each stop, resume, rewind and takeover, and how the
+run ended, with a one-line verdict, a few lines of evidence (counts, commands, a short commit id)
+and the links it already holds, and the repository's name as `host/owner/name`. The agent forwards
+nothing. **Never** session text, a prompt or a file's content; anything shaped like a credential is
+withheld. DevStride keeps it as an add-only record you can read and export on the run's page.
 `"workflows": null` in a repository's `.claude/ds-config.json` switches it off for that
-repository; `DEVSTRIDE_WORKFLOWS=0` switches a whole machine off. Where DevStride cannot take a
-report nothing is sent, said or delayed. The contract is
+repository; `DEVSTRIDE_WORKFLOWS=0` switches a whole machine off. Where DevStride cannot be reached
+the history waits in a file beside the run's state and is sent later; the run is never stopped or
+slowed, and you are told once. The contract is
 `skills/build-item/references/workflow-reports.md`.
 
 ## Configure it for your repo
@@ -639,7 +643,8 @@ definition its clearance scope picks through the step runner, one step at a time
 
 `skills/run-workflow/scripts/workflow.py` walks a workflow definition one step at a time, and
 `schemas/step-contracts.json` is the catalog of what each kind of step must answer with and what
-proof it must leave. The runner is one plain Python 3 file (standard library only, no network): a
+proof it must leave. The runner is one plain Python 3 file (standard library only; its one network
+call sends the run's history to DevStride, and `"workflows": null` switches that off): a
 person, Codex or the plugin's own loop asks it `next`, runs the step it names, hands the step's
 answer back with `done`, and asks `status` to see where the run is. It gives the same answers after
 a restart or a cleared conversation, because the run's position lives in a small owner-only file
@@ -683,7 +688,7 @@ changed hash, a newer plugin needed, or a step list the runner refuses) falls ba
 one with one plain line. The chosen workflow is pinned for the whole run, so a later publish
 changes only the next run. A custom step may name a skill file in your own repository; it is read
 from the commit the checkout is on, never from an uncommitted edit, capped at 64 KB and never
-executed. The same switch that turns step reports off turns this off. The procedure is
+executed. The same switch that turns the run history off turns this off. The procedure is
 `skills/run-workflow/references/fetching-the-workflow.md`.
 
 ### Agents that do not run these skills
@@ -724,7 +729,7 @@ jq -n --slurpfile c .claude/ds-config.json '{config: $c[0], heads: ["develop"], 
 under a committed token budget, with rationale moved to per-skill references loaded only at
 the step that needs them; the full before/after table is in the CHANGELOG.
 
-Current version: **4.16.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
+Current version: **5.0.0** — see [CHANGELOG.md](CHANGELOG.md) for what changed, and
 [RELEASING.md](RELEASING.md) for how releases are cut.
 
 The public repository, `devstride/claude-plugin`, is a published copy written only by the release

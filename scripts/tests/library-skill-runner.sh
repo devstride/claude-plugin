@@ -6,6 +6,11 @@
 set -u
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
+# The step runner sends a run's history itself, with this machine's own DevStride key. No test may
+# find one: each runs with a home folder of its own, no key in its environment, and the one
+# address a call could go to set to a port of this machine that nothing listens on.
+export HOME="$WORK/home" XDG_CONFIG_HOME="$WORK/home/.config" DEVSTRIDE_PLUGIN_TEST_URL="http://127.0.0.1:9"; mkdir -p "$HOME"
+unset CLAUDE_CONFIG_DIR DEVSTRIDE_API_KEY DEVSTRIDE_API_SECRET DEVSTRIDE_ORG_ID DEVSTRIDE_ORG_SLUG DEVSTRIDE_BASE_URL
 export PYTHONDONTWRITEBYTECODE=1
 unset CLAUDE_CODE_SESSION_ID CODEX_THREAD_ID GIT_DIR GIT_WORK_TREE
 export XDG_CACHE_HOME="$WORK/cache"
@@ -35,7 +40,23 @@ def check(label, good, detail=""):
 
 def run(command, request):
     done = subprocess.run([sys.executable, "-B", RUNNER, command], input=json.dumps(request), capture_output=True, text=True, cwd=WORK, timeout=60)
-    return done.returncode, (json.loads(done.stdout) if done.returncode == 0 and done.stdout.strip() else None), done.stderr
+    answer = json.loads(done.stdout) if done.returncode == 0 and done.stdout.strip() else None
+    return done.returncode, journal(answer), done.stderr
+
+
+def journal(answer):
+    """The runner hands out no step reports: it journals events and sends them itself. Nothing here
+    has a DevStride to send to, so `reports` on an answer is what that one command journaled, read
+    from the run's outbox by the scenario driver (run_scenarios.py)."""
+    if not TOLD:
+        spec = importlib.util.spec_from_file_location("run_scenarios", os.path.join(ROOT, "scripts/tests/run_scenarios.py"))
+        TOLD.append(importlib.util.module_from_spec(spec))
+        spec.loader.exec_module(TOLD[0])
+        TOLD.append({})
+    return TOLD[0].told(answer, os.environ["XDG_CACHE_HOME"], TOLD[1])
+
+
+TOLD = []
 
 
 def session():
