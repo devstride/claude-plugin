@@ -107,7 +107,9 @@ paths individually) rather than trusting a single root-level run.
   UserPromptSubmit), `presence.py` (the session's live status, on ten events; it runs the
   consuming repository's presence command, else `presence-report.py`, the built-in reporter) and
   `stop-gate.py` (PreToolUse and UserPromptSubmit: a session a person stopped on the Agent Fleet
-  runs no tool and takes no prompt). All fail open and never block a
+  runs no tool and takes no prompt) and `run-watch.py` (PreToolUse for Skill, Agent and Task, and
+  Stop: a workflow run is driven only in the main conversation, step agents run in the foreground,
+  and a turn that leaves a run with a step nothing is running is held once). All fail open and never block a
   session by accident. Skill-owned helpers live under `skills/<name>/scripts/` and are run by
   the skill's text, never read as context.
 - `schemas/` holds `seam-registry.json`, the one list of every config key and hook (hand-edited),

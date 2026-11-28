@@ -94,7 +94,10 @@ could be leased by another session while the release still uses it). Never resum
 release; the fleet's hourly machine check never starts one. No batching wait beyond the ship plan's
 (`${CLAUDE_PLUGIN_ROOT}/skills/release/references/ship-plan.md`: at most `peerWaitMinutes`, only
 for a peer that says it is nearly ready): each release carries whatever landed during the previous
-cycle, and there is never a second concurrent release.
+cycle, and there is never a second concurrent release. **Inside an agent**, never claim at a trigger
+and never invoke `release`: report `START` to the conversation that started you, which claims and
+releases (`release` runs only in the main conversation; a release run's own step agent claims as
+its step says).
 
 **The backstop** (`release.backstop.mode` shadow or live) enters this same path, on a schedule, only
 when landed work has waited too long. Read

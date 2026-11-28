@@ -290,7 +290,7 @@ G="$G$(printf '{"session_id":"m1","effort":{"level":"low"}}' | XDG_CACHE_HOME="$
 CMD="$(python3 -c 'import json,sys
 h = json.load(open(sys.argv[1]))["hooks"]["PreToolUse"]
 c = [x for g in h for x in g["hooks"] if "hooks/session-runtime.py\" seen;" in x["command"] and x.get("timeout") == 5 and x["command"].endswith("exit 0")]
-assert len(c) == 1 and all("matcher" not in g for g in h); print(c[0]["command"])' "$ROOT/hooks/hooks.json")"
+assert len(c) == 1 and all("matcher" not in g for g in h if c[0] in g["hooks"]); print(c[0]["command"])' "$ROOT/hooks/hooks.json")"
 G="$G$(printf '{"session_id":"m1"}' | env -i PATH="$WORK/nobin" CLAUDE_PLUGIN_ROOT="$ROOT" /bin/sh -c "$CMD" 2>&1)$?"
 if [ "$G" = 000000 ] && [ "$(stamp m1)" = "$S2" ] && [ -n "$CMD" ]; then
   ok "(20) seen fails open on garbage (no write, silent, exit 0); hooks.json runs it on every PreToolUse, 5 s timeout, exit 0 without python3"

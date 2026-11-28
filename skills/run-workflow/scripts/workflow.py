@@ -3794,7 +3794,8 @@ def command_status_all(world, request):
     """This session's unfinished runs, oldest first. Read-only. With `others` true, also the
     unfinished runs other sessions left in this checkout (`cwd`), which a new session adopts by
     their run ids: it never sees them otherwise. A run in another checkout of the repository is
-    another session's live work, never listed here. With `unsent` true, also every run of this
+    another session's live work, never listed here. Each row names the checkout its run is bound to
+    (`cwd`): one session's helper agents may drive runs in checkouts of their own. With `unsent` true, also every run of this
     user on this machine whose history DevStride does not hold yet (unsent_history)."""
     session, folder = session_of(request, world), state_dir(world, create=False)
     others, unsent = request.get("others", False), request.get("unsent", False)
@@ -3811,7 +3812,8 @@ def command_status_all(world, request):
         row = {"runId": state["runId"], "item": state["item"], "workflowId": pinned_workflow(state)["id"],
                "workflow": workflow_line(state), "startedAt": state["startedAt"],
                "state": run_state(state), "position": position_of(state),
-               "stopped": state["stopped"], "waiting": waiting, "parkedAt": parked_at(state)}
+               "stopped": state["stopped"], "waiting": waiting, "parkedAt": parked_at(state),
+               "cwd": state["context"].get("cwd")}
         if state["sessionId"] == session:
             runs.append(row)
         elif others and os.path.realpath(str(state["context"].get("cwd") or "")) == os.path.realpath(cwd):

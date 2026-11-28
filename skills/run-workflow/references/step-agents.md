@@ -35,9 +35,9 @@ verdict: name them in the next progress line, in plain words. The action is one 
 - **`run`**: `step`, `skill`, `payload`, `argument`, `heartbeat` and `agent`, which says where it
   runs:
   - **`routine`**: start the `devstride:workflow-steps` agent (a smaller model) through the Agent
-    tool and wait for it, running nothing of the run meanwhile (in the foreground where the tool
-    allows; in the background, arm the stall timer below). It runs this step and each routine step
-    after it.
+    tool and wait for it, running nothing of the run meanwhile (in the foreground: pass
+    `run_in_background: false`, as some hosts default to the background; one moved there anyway:
+    arm the stall timer below). It runs this step and each routine step after it.
   - **`judgement`**: the same, with the `devstride:workflow-judgement` agent (the session's own
     model). It runs this step and each `judgement` step after it; the routine ones between go
     back to the smaller model.
@@ -70,24 +70,34 @@ the agent quoted for a step that stopped to ask, and any recap it quoted. A line
 agent, knows where the run is.
 
 **A step agent that stops answering.** A background agent held at a prompt nobody can see stalls
-the run silently, while a busy one may work on one step for a long time. So with each one started,
+the run silently, while a busy one may spend long on one step. So with each one started,
 note the run's `position`, that step's `attempt` (`status`) and when its transcript last changed
-(the `output_file` the Agent tool names when it starts the agent, which grows with each call the
-agent makes: read its modification time only, never its contents,
+(the `output_file` the Agent tool names, which grows with each call the agent
+makes: read its modification time only, never its contents,
 `python3 -c 'import os,sys; print(os.stat(sys.argv[1]).st_mtime)' <file>`), and arm a timer, a
 background `sleep 900` that tells this conversation when it ends. A notice that the agent stopped
-with work of its own still running is not its answer: wait on, the timer armed, noting its
-transcript's time then (an agent that stopped so is not held at a prompt until it writes again).
-When the timer fires first, `status` with the `runId` and read that time again: the position or
-attempt moved, the issued step is `waiting`, or the transcript changed or still reads the time
-noted at such a notice → note them and arm it again; none of these → stop the agent, then
-`status` with `evidence` `true` (the results of the steps it finished, as its answer would have
-quoted them) and `next`, and run the issued step here (steps are safe to re-run). No
-`output_file` named or readable → the position, the attempt and `waiting` decide alone. When the
-agent answers, stop its timer; one that fires after that is ignored. After a compaction, an agent
+with its own work running may be interim, not its answer: it may resume when that work ends,
+notifying again. Take the step over only as the timer says, never beside it (it would run twice),
+never restarting that work. When the timer fires, `status` with the `runId` and read that
+time again: the position or attempt moved, the transcript changed, or the step is `waiting` while
+its reporting agent runs or waits on its own work → note them and arm it again; none of these →
+stop the agent and see it exit, let any command it left end, then `status` with `evidence` `true`
+(what it finished) and `next`: moved meanwhile → it answered; else run the issued step here (safe
+to re-run; reuse that command's output). No
+`output_file` named or readable → position, attempt and `waiting` decide alone. When the
+agent answers, stop its timer; a later firing is ignored. After a compaction, an agent
 started before it may still be running: wait for its answer before starting another for the
-issued step, noting its position, attempt and transcript time anew and keeping a timer still
-pending (arming one only when none is).
+issued step, noting its position, attempt and transcript time anew and keeping a pending
+timer (arming one only when none is).
+
+**Only this conversation drives a run.** The plugin refuses `release`, `plan`, `run-workflow`,
+`branch-hotfix` and `rebalance` inside an agent, and a step agent started in the background. Only
+the agent started for the issued step gives that step's answer: a notice from any other task, or
+an Agent result saying it carries on in the background, is none. Before ending a turn to ask the
+person inside a step run here, report `wait` with the question as its reason. When this
+conversation ends a turn while one of its runs has a step nothing is running, the plugin holds the
+turn once: carry the run on, ending the turn again only for a pause the person asked for or a
+question already shown to them. A hold is never a yes.
 
 **No agent available** (a tool with no Agent tool, or the agents are not listed): read
 `workflow-runner.md` in full, then run every step here.
@@ -108,7 +118,9 @@ steps). Read the whole of this section; nothing above it is yours.
    minutes (a test suite, a review engine, a deploy: start it in the background) or that the tool
    moved to the background, is reported with `wait` (`runId`, `stepId`, `attempt`, a one-line
    `reason`) once that wait or command is under way, never before it, so the driver can tell it
-   from a stuck one: a command held at a prompt never starts, and its step stays `running`.
+   from a stuck one: a command held at a prompt never starts, and its step stays `running`. After
+   `wait`, never end your turn while that command runs: watch it in the foreground until it ends,
+   then `done`.
 3. **`done`** with `runId`, `stepId`, `attempt` and `output`, the skill's WHOLE final answer. Its result
    block holds every field the contract's `result` requires, as the type it names (a missing or
    mistyped field fails the step): read that entry of `${CLAUDE_PLUGIN_ROOT}/schemas/step-contracts.json`
